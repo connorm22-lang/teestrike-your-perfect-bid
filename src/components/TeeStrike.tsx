@@ -247,22 +247,43 @@ function Countdown({ seconds }: { seconds: number }) {
 /* ── AI CADDIE ──────────────────────────────────────────── */
 
 async function getCaddieAdvice(course: Course, auction: Auction, bidAmount: number, signal?: AbortSignal) {
-  const premium = Math.round((bidAmount / course.rack - 1) * 100);
-  const timeLeft = auction.endsIn < 3600 ? `${Math.floor(auction.endsIn / 60)} minutes` : `${Math.round(auction.endsIn / 3600)} hours`;
+  const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+  const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
-  const takes = [
-    premium < 10
-      ? `${course.short} at only +${premium}% is a steal — expect someone to contest this before the ${timeLeft} close. Lock it now.`
-      : premium < 20
-        ? `Solid read. +${premium}% on ${course.short} is right in the zone where serious golfers commit. ${auction.bids} bids means real demand.`
-        : premium < 35
-          ? `You're paying for access, not just a tee time. ${course.short} is worth the premium if you value the experience. ${timeLeft} left.`
-          : `Bold. +${premium}% on ${course.short} sends a message. ${auction.bids} other people want this time slot — make it count.`,
-  ];
+  // Fallback advice if edge function fails
+  const fallbackAdvice = () => {
+    const premium = Math.round((bidAmount / course.rack - 1) * 100);
+    const timeLeft = auction.endsIn < 3600 ? `${Math.floor(auction.endsIn / 60)} minutes` : `${Math.round(auction.endsIn / 3600)} hours`;
+    if (premium < 10) return `${course.short} at only +${premium}% is a steal — expect someone to contest this before the ${timeLeft} close. Lock it now.`;
+    if (premium < 20) return `Solid read. +${premium}% on ${course.short} is right in the zone where serious golfers commit. ${auction.bids} bids means real demand.`;
+    if (premium < 35) return `You're paying for access, not just a tee time. ${course.short} is worth the premium if you value the experience. ${timeLeft} left.`;
+    return `Bold. +${premium}% on ${course.short} sends a message. ${auction.bids} other people want this time slot — make it count.`;
+  };
 
-  await new Promise(resolve => setTimeout(resolve, 600 + Math.random() * 400));
-  if (signal?.aborted) throw new Error("aborted");
-  return takes[0];
+  try {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/caddie`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${SUPABASE_KEY}`,
+      },
+      body: JSON.stringify({ course, auction, bidAmount }),
+      signal,
+    });
+
+    if (!res.ok) {
+      console.warn('Caddie edge function error, using fallback');
+      return fallbackAdvice();
+    }
+
+    const data = await res.json();
+    return data.advice || fallbackAdvice();
+  } catch (err) {
+    if ((err as Error).name === 'AbortError') throw err;
+    console.warn('Caddie fetch failed, using fallback:', err);
+    return fallbackAdvice();
+  }
 }
 
 /* ── OUTBID BANNER ──────────────────────────────────────── */
