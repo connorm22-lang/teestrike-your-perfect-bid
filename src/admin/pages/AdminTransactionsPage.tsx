@@ -41,8 +41,7 @@ const TX_HISTORY: Record<string, { who: string; amount: number; when: string }[]
 
 export default function AdminTransactionsPage() {
   const [openId, setOpenId] = useState<string | null>(null);
-  const totalRevenue = TX.filter((t) => t.status === "PAID").reduce((s, t) => s + t.payout || s + t.bid, 0);
-  // payout = bid in this model (course gets 100%)
+  // Course gets 100% of clearing price; premium is on top of payout.
   const total = TX.filter((t) => t.status === "PAID").reduce((s, t) => s + t.bid, 0);
 
   const open = openId ? TX.find((t) => t.id === openId) : null;
