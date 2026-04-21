@@ -1,8 +1,8 @@
 import { useState, FormEvent } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { useCourseAdmin } from "./CourseAdminContext";
-import { AdminStyles } from "./AdminLayout";
-import { useAdminToast } from "./useToast";
+import { useCourseAdmin } from "../CourseAdminContext";
+import { AdminStyles } from "../AdminLayout";
+import { useAdminToast } from "../useToast";
 
 const DEMO_EMAIL = "admin@waterchase.com";
 const DEMO_PASSWORD = "password123";

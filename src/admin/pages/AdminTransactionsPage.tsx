@@ -7,8 +7,6 @@ type Tx = {
   winner: string;
   email: string;
   bid: number;
-  premium: number;
-  payout: number;
   status: Status;
   closed: string;
   transferId: string;
