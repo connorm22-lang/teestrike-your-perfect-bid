@@ -1,0 +1,143 @@
+{
+  "version": 1,
+  "sdk_version": "0.25.0",
+  "path": "/functions/v1/mcp",
+  "auth": {
+    "type": "none"
+  },
+  "mcp": {
+    "server": {
+      "name": "teestrike-mcp",
+      "version": "0.1.0",
+      "title": "TeeStrike"
+    },
+    "tools": [
+      {
+        "name": "list_courses",
+        "title": "List courses",
+        "description": "List every golf course on the TeeStrike marketplace with its rack rate, location, and number of open tee time auctions.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "maxRackRate": {
+              "description": "Only return courses whose rack rate per player is at or below this dollar amount.",
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
+          }
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "get_course",
+        "title": "Get course details",
+        "description": "Get the full profile of one TeeStrike course: description, designer, yardage, par, amenities, rack rate, and its auction date.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "course": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Course name (partial match allowed) or numeric course id."
+            }
+          },
+          "required": [
+            "course"
+          ]
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "list_tee_times",
+        "title": "List tee time auctions",
+        "description": "List live tee time auctions with current bid, bid count, group size, and time remaining. Filter by course, group size, or how soon the auction closes.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "course": {
+              "description": "Course name (partial match allowed) or id. Omit to search all courses.",
+              "type": "string"
+            },
+            "players": {
+              "description": "Only slots for this group size.",
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 4
+            },
+            "closingWithinHours": {
+              "description": "Only auctions closing within this many hours.",
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "maxBid": {
+              "description": "Only auctions whose current bid per player is at or below this.",
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
+          }
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "estimate_bid_cost",
+        "title": "Estimate bid cost",
+        "description": "Estimate the all-in cost of a TeeStrike bid: per-player bid, TeeStrike's 14% buyer's premium, group total, and how the bid compares to the course rack rate and the current leading bid.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "course": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Course name (partial match allowed) or numeric course id."
+            },
+            "bidPerPlayer": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "description": "Proposed bid amount per player, in dollars."
+            },
+            "players": {
+              "default": 4,
+              "description": "Number of players in the group.",
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 4
+            },
+            "time": {
+              "description": "Optional tee time (e.g. '7:14 AM') to compare against that slot's leading bid.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "course",
+            "bidPerPlayer"
+          ]
+        },
+        "outputSchema": null
+      }
+    ]
+  }
+}
