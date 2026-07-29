@@ -1323,12 +1323,14 @@ function ProfilePage({ auctions, events, userBids, user }: {
           fontFamily: "var(--serif)", fontSize: 32, fontWeight: 600, color: "var(--gold)",
           border: "2px solid var(--border-h)",
         }}>
-          TS
+          {(user.email || "TS").slice(0, 2).toUpperCase()}
         </div>
         <div style={{ flex: 1 }}>
-          <div style={{ fontFamily: "var(--serif)", fontSize: 28, fontWeight: 600 }}>Taylor Strickland</div>
+          <div style={{ fontFamily: "var(--serif)", fontSize: 28, fontWeight: 600 }}>
+            {user.user_metadata?.full_name || (user.email || "").split("@")[0]}
+          </div>
           <div style={{ fontFamily: "var(--mono)", fontSize: 12, color: "var(--dim)", marginTop: 4 }}>
-            taylor@teestrike.com · Member since Mar 2024
+            {user.email} · Member since {new Date(user.created_at).toLocaleDateString("en-US", { month: "short", year: "numeric" })}
           </div>
           <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
             <span style={{
@@ -1345,13 +1347,14 @@ function ProfilePage({ auctions, events, userBids, user }: {
             }}>HCP 8.4</span>
           </div>
         </div>
-        <button style={{
+        <button onClick={() => supabase.auth.signOut()} style={{
           background: "none", border: "1px solid var(--border)",
           color: "var(--dim)", padding: "10px 18px", borderRadius: 8,
           fontFamily: "var(--mono)", fontSize: 11, letterSpacing: "1px",
         }}>
-          EDIT PROFILE
+          SIGN OUT
         </button>
+
       </div>
 
       {/* Stats grid */}
