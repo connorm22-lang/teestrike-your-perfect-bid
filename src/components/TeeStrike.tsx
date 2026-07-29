@@ -1017,14 +1017,24 @@ function BidModal({ auction, course, onClose, onConfirm }: {
                 </div>
               </div>
 
-              <button onClick={confirm} style={{
+              {bidErr && (
+                <div style={{
+                  marginTop: 14, padding: "10px 12px", borderRadius: 8,
+                  background: "rgba(220,80,80,0.08)", border: "1px solid rgba(220,80,80,0.25)",
+                  fontFamily: "var(--mono)", fontSize: 11.5, color: "var(--red)", lineHeight: 1.5,
+                }}>{bidErr}</div>
+              )}
+
+              <button onClick={confirm} disabled={submitting} style={{
                 width: "100%", marginTop: 16, padding: "14px",
                 background: "linear-gradient(135deg, var(--gold), #b89a3e)",
                 color: "#0a0a0a", border: "none", borderRadius: 8,
                 fontFamily: "var(--mono)", fontSize: 13, letterSpacing: "1.5px", fontWeight: 600,
+                opacity: submitting ? 0.6 : 1,
               }}>
-                CONFIRM ${amt} BID
+                {submitting ? "PLACING…" : `CONFIRM $${amt} BID`}
               </button>
+
             </div>
           </>
         ) : (
