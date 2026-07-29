@@ -178,7 +178,7 @@ const COURSE_PRESENTATION: Record<string, Partial<Course>> = {
     short: "Coyote Ridge", tag: "Links",
     desc: "Wide links-inspired corridors with fescue framing and fast, tilted greens.",
     longDesc: "Carrollton's Coyote Ridge plays firm and fast with links-style movement across the property. Fescue-framed fairways offer generous width off the tee, but tilted green complexes and the ever-present prairie wind make scoring a genuine test.",
-    img: "https://images.unsplash.com/photo-1600006195232-1ac2cca26e73?w=600&h=400&fit=crop",
+    img: "https://images.unsplash.com/photo-1587174486073-ae5e5cff23aa?w=600&h=400&fit=crop",
     yardage: 6800, par: 71, designer: "Jeff Brauer", established: 1999,
     amenities: ["Lighted Range", "Fescue Rough", "Grill", "Pro Shop", "Fitting Studio"],
   },
@@ -204,7 +204,7 @@ const FALLBACK_IMAGES = [
   "https://images.unsplash.com/photo-1587174486073-ae5e5cff23aa?w=600&h=400&fit=crop",
   "https://images.unsplash.com/photo-1535131749006-b7f58c99034b?w=600&h=400&fit=crop",
   "https://images.unsplash.com/photo-1592919505780-303950717480?w=600&h=400&fit=crop",
-  "https://images.unsplash.com/photo-1600006195232-1ac2cca26e73?w=600&h=400&fit=crop",
+  "https://images.unsplash.com/photo-1587174486073-ae5e5cff23aa?w=600&h=400&fit=crop",
 ];
 
 /* Populated from the database before the marketplace renders. */
@@ -282,9 +282,11 @@ async function loadMarketplace(): Promise<{ courses: Course[]; auctions: Auction
   const courses = (courseRes.data || []).map(toCourse);
   const courseIds = new Set(courses.map(c => c.id));
   const auctions = (auctionRes.data || [])
+    .slice()
+    .sort((a: any, b: any) =>
+      `${a.tee_date}T${a.tee_time}`.localeCompare(`${b.tee_date}T${b.tee_time}`))
     .map(toAuction)
-    .filter((a: Auction) => courseIds.has(a.courseId))
-    .sort((a: Auction, b: Auction) => a.time.localeCompare(b.time));
+    .filter((a: Auction) => courseIds.has(a.courseId));
 
   return { courses, auctions };
 }
