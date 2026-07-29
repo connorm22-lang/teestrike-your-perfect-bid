@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 /* ─────────────────────────────────────────────────────────────
    DESIGN SYSTEM  
@@ -294,7 +295,7 @@ const BIDDER_NAMES = ["J. Morrison", "A. Patel", "T. Walker", "R. Chen", "S. Dav
 
 interface BidEvent {
   id: number;
-  auctionId: number;
+  auctionId: string;
   type: string;
   amount: number;
   bidder: string;
@@ -302,7 +303,7 @@ interface BidEvent {
 }
 
 interface OutbidAlert {
-  auctionId: number;
+  auctionId: string;
   newBid: number;
   bidder: string;
 }
@@ -311,7 +312,7 @@ function useLiveAuctions(initial: Auction[]) {
   const [auctions, setAuctions] = useState(initial);
   const [events, setEvents] = useState<BidEvent[]>([]);
   const [outbidAlert, setOutbidAlert] = useState<OutbidAlert | null>(null);
-  const userBidsRef = useRef<Record<number, number>>({});
+  const userBidsRef = useRef<Record<string, number>>({});
 
   useEffect(() => {
     const fire = () => {
@@ -359,7 +360,7 @@ function useLiveAuctions(initial: Auction[]) {
     return () => clearInterval(tick);
   }, []);
 
-  const placeBid = useCallback((auctionId: number, amount: number) => {
+  const placeBid = useCallback((auctionId: string, amount: number) => {
     userBidsRef.current[auctionId] = amount;
     const event: BidEvent = { id: Date.now(), auctionId, type: "user_bid", amount, bidder: "You", ts: Date.now() };
     setEvents(ev => [event, ...ev.slice(0, 29)]);
@@ -1393,7 +1394,7 @@ export default function TeeStrike() {
   const [dismissOutbid, setDismissOutbid] = useState(false);
   const [tab, setTab] = useState<Tab>("MARKET");
 
-  const handleConfirm = (id: number, amt: number) => {
+  const handleConfirm = (id: string, amt: number) => {
     placeBid(id, amt);
     setBidTarget(null);
   };
