@@ -890,8 +890,9 @@ function BidModal({ auction, course, onClose, onConfirm }: {
   auction: Auction;
   course: Course;
   onClose: () => void;
-  onConfirm: (id: string, amt: number) => void;
+  onConfirm: (id: string, amt: number) => Promise<BidResult>;
 }) {
+
   const min = auction.bid + 5;
   const [amt, setAmt] = useState(Math.ceil((auction.bid + 25) / 25) * 25);
   const [caddie, setCaddie] = useState<string | null>(null);
