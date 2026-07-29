@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 /* ─────────────────────────────────────────────────────────────
    DESIGN SYSTEM  
@@ -125,7 +126,7 @@ button { font-family: var(--mono); cursor: pointer; }
 /* ── DATA ───────────────────────────────────────────────── */
 
 interface Course {
-  id: number;
+  id: string;
   name: string;
   short: string;
   loc: string;
@@ -141,53 +142,9 @@ interface Course {
   amenities: string[];
 }
 
-const COURSES: Course[] = [
-  {
-    id: 1, name: "Fields Ranch East", short: "Fields Ranch", loc: "Frisco · PGA HQ",
-    desc: "PGA of America's championship-ready masterpiece. Firm, fast greens that punish mediocre approaches.",
-    longDesc: "Home of the PGA of America's new headquarters, Fields Ranch East is a Gil Hanse design that has already hosted the KitchenAid Senior PGA Championship. Wide fairways invite aggressive play but the bentgrass greens — among the firmest and fastest in Texas — demand pinpoint approaches. Expect 20+ mph crosswinds and elevation changes that play with depth perception.",
-    rack: 295, img: "https://images.unsplash.com/photo-1587174486073-ae5e5cff23aa?w=600&h=400&fit=crop", tag: "PGA HQ",
-    yardage: 7868, par: 72, designer: "Gil Hanse", established: 2023,
-    amenities: ["Caddie Service", "GPS Carts", "Practice Range", "Short Game Area", "PGA Coaching"]
-  },
-  {
-    id: 2, name: "TPC Craig Ranch", short: "Craig Ranch", loc: "McKinney · Tour Venue",
-    desc: "Annual PGA Tour stop. Pure bentgrass greens, pristine conditioning year-round.",
-    longDesc: "Host of the THE CN Byron Nelson, TPC Craig Ranch delivers a true Tour-caliber test. Tom Weiskopf's design weaves through native grasslands with strategic bunkering and water on 11 holes. The signature par-3 17th plays over a lake to a peninsula green — pure theater. Conditioning is famously immaculate.",
-    rack: 245, img: "https://images.unsplash.com/photo-1535131749006-b7f58c99034b?w=600&h=400&fit=crop", tag: "Tour",
-    yardage: 7468, par: 72, designer: "Tom Weiskopf", established: 2003,
-    amenities: ["Tour-Grade Range", "Locker Room", "Fine Dining", "Pro Shop", "Forecaddies"]
-  },
-  {
-    id: 3, name: "Cowboys Golf Club", short: "Cowboys GC", loc: "Grapevine · Dallas",
-    desc: "The only NFL-themed golf club in existence. Premium experience with Star-level hospitality.",
-    longDesc: "The world's only NFL-themed golf club. Each hole tells a chapter of Dallas Cowboys history with memorabilia tee markers and a clubhouse that doubles as a Cowboys museum. The Jeff Brauer design plays through rolling hills with creek crossings and dramatic bunkering. Service standards rival a five-star resort.",
-    rack: 210, img: "https://images.unsplash.com/photo-1592919505780-303950717480?w=600&h=400&fit=crop", tag: "NFL",
-    yardage: 7017, par: 72, designer: "Jeff Brauer", established: 2001,
-    amenities: ["Cowboys Museum", "Concierge Caddies", "Premium Carts", "Steakhouse", "Cigar Lounge"]
-  },
-  {
-    id: 4, name: "The Tribute", short: "The Tribute", loc: "The Colony · Links",
-    desc: "Links-style championship course inspired by the great Scottish and Irish seaside courses.",
-    longDesc: "A loving tribute to the British Isles' greatest links. Holes are inspired by St Andrews, Royal Troon, Carnoustie, and Lahinch — pot bunkers, fescue rough, and burns included. Plays along Lewisville Lake giving genuine seaside winds. Bring the bump-and-run; aerial games get punished here.",
-    rack: 195, img: "https://images.unsplash.com/photo-1600006195232-1ac2cca26e73?w=600&h=400&fit=crop", tag: "Links",
-    yardage: 7002, par: 72, designer: "Tripp Davis", established: 2000,
-    amenities: ["Lakeside Range", "Authentic Pot Bunkers", "Caddie Program", "Pub Clubhouse", "Fitting Studio"]
-  },
-];
-
-interface TeeTimeSlot {
-  id: number;
-  time: string;
-  players: number;
-  bid: number;
-  bids: number;
-  endsIn: number;
-}
-
 interface Auction {
-  id: number;
-  courseId: number;
+  id: string;
+  courseId: string;
   date: string;
   time: string;
   players: number;
@@ -198,64 +155,141 @@ interface Auction {
   _userLeading?: boolean;
 }
 
-const TEE_TIMES_BY_COURSE: Record<number, { date: string; slots: { time: string; players: number; bid: number; bids: number; endsIn: number }[] }> = {
-  1: {
-    date: "Sat Apr 5",
-    slots: [
-      { time: "6:42 AM", players: 4, bid: 310, bids: 4, endsIn: 4800 },
-      { time: "7:14 AM", players: 4, bid: 340, bids: 7, endsIn: 5420 },
-      { time: "7:46 AM", players: 4, bid: 325, bids: 5, endsIn: 6100 },
-      { time: "8:18 AM", players: 2, bid: 290, bids: 3, endsIn: 7200 },
-      { time: "9:22 AM", players: 4, bid: 315, bids: 6, endsIn: 9600 },
-      { time: "10:30 AM", players: 4, bid: 285, bids: 2, endsIn: 12400 },
-    ],
+/* Editorial presentation details per course (copy + imagery only —
+   pricing, availability and auction state all come from the database). */
+const COURSE_PRESENTATION: Record<string, Partial<Course>> = {
+  "texas-rangers": {
+    short: "Rangers GC", tag: "MLB",
+    desc: "The only MLB-themed course in the country. Immaculate paspalum, ballpark views.",
+    longDesc: "Reimagined by John Colligan in partnership with the Texas Rangers, this Arlington layout plays in the shadow of Globe Life Field. Wide paspalum fairways, bold bunkering and a stadium-inspired clubhouse make it the most distinctive muni-plus experience in the Metroplex.",
+    img: "https://images.unsplash.com/photo-1587174486073-ae5e5cff23aa?w=600&h=400&fit=crop",
+    yardage: 6800, par: 70, designer: "John Colligan", established: 2021,
+    amenities: ["GPS Carts", "Practice Range", "Short Game Area", "Grill & Bar", "Pro Shop"],
   },
-  2: {
-    date: "Fri Apr 4",
-    slots: [
-      { time: "6:18 AM", players: 4, bid: 240, bids: 5, endsIn: 1800 },
-      { time: "6:50 AM", players: 4, bid: 260, bids: 9, endsIn: 2180 },
-      { time: "7:22 AM", players: 4, bid: 255, bids: 6, endsIn: 2900 },
-      { time: "8:04 AM", players: 2, bid: 230, bids: 3, endsIn: 3600 },
-      { time: "9:08 AM", players: 4, bid: 250, bids: 4, endsIn: 5400 },
-      { time: "11:14 AM", players: 4, bid: 215, bids: 2, endsIn: 12800 },
-      { time: "1:42 PM", players: 4, bid: 195, bids: 1, endsIn: 21600 },
-    ],
+  bridlewood: {
+    short: "Bridlewood", tag: "Parkland",
+    desc: "Rolling parkland design with dramatic elevation and mature tree lines.",
+    longDesc: "D.A. Weibring's Flower Mound design threads through native creeks and hardwood stands. Elevation changes are rare for North Texas and the greens complexes reward a controlled ball flight. Conditioning holds up through the summer heat.",
+    img: "https://images.unsplash.com/photo-1535131749006-b7f58c99034b?w=600&h=400&fit=crop",
+    yardage: 6982, par: 72, designer: "D.A. Weibring", established: 1997,
+    amenities: ["Practice Range", "Locker Room", "Event Lawn", "Pro Shop", "Cart Fleet"],
   },
-  3: {
-    date: "Sun Apr 6",
-    slots: [
-      { time: "7:00 AM", players: 4, bid: 220, bids: 3, endsIn: 11000 },
-      { time: "8:00 AM", players: 4, bid: 225, bids: 2, endsIn: 14400 },
-      { time: "8:32 AM", players: 4, bid: 235, bids: 4, endsIn: 15200 },
-      { time: "9:16 AM", players: 2, bid: 210, bids: 2, endsIn: 16800 },
-      { time: "10:48 AM", players: 4, bid: 215, bids: 1, endsIn: 21600 },
-    ],
+  "coyote-ridge": {
+    short: "Coyote Ridge", tag: "Links",
+    desc: "Wide links-inspired corridors with fescue framing and fast, tilted greens.",
+    longDesc: "Carrollton's Coyote Ridge plays firm and fast with links-style movement across the property. Fescue-framed fairways offer generous width off the tee, but tilted green complexes and the ever-present prairie wind make scoring a genuine test.",
+    img: "https://images.unsplash.com/photo-1587174486073-ae5e5cff23aa?w=600&h=400&fit=crop",
+    yardage: 6800, par: 71, designer: "Jeff Brauer", established: 1999,
+    amenities: ["Lighted Range", "Fescue Rough", "Grill", "Pro Shop", "Fitting Studio"],
   },
-  4: {
-    date: "Sat Apr 5",
-    slots: [
-      { time: "8:14 AM", players: 4, bid: 205, bids: 3, endsIn: 7200 },
-      { time: "9:30 AM", players: 2, bid: 215, bids: 4, endsIn: 8600 },
-      { time: "10:02 AM", players: 4, bid: 200, bids: 2, endsIn: 9800 },
-      { time: "11:18 AM", players: 4, bid: 195, bids: 2, endsIn: 12000 },
-      { time: "12:50 PM", players: 2, bid: 185, bids: 1, endsIn: 18400 },
-      { time: "2:24 PM", players: 4, bid: 175, bids: 1, endsIn: 24000 },
-    ],
+  grapevine: {
+    short: "Grapevine", tag: "Lakeside",
+    desc: "27 holes above Grapevine Lake. Best value round in the northeast Metroplex.",
+    longDesc: "A 27-hole municipal complex perched above Grapevine Lake with genuine water views on multiple holes. The Bluebonnet and Mockingbird nines offer the most drama, with elevated tees and approach shots played into a steady lake breeze.",
+    img: "https://images.unsplash.com/photo-1592919505780-303950717480?w=600&h=400&fit=crop",
+    yardage: 6953, par: 72, designer: "Byron Nelson / Joe Finger", established: 1979,
+    amenities: ["27 Holes", "Lake Views", "Practice Range", "Snack Bar", "Cart Fleet"],
+  },
+  waterchase: {
+    short: "Waterchase", tag: "Water",
+    desc: "Water in play on eleven holes. Strategic risk-reward from the first tee.",
+    longDesc: "Fort Worth's Waterchase lives up to its name — lakes, creeks and wetlands come into play across eleven holes. The Dick Phelps design demands committed shot selection, and the closing stretch is one of the most photographed finishes in Tarrant County.",
+    img: "https://images.unsplash.com/photo-1535131749006-b7f58c99034b?w=600&h=400&fit=crop",
+    yardage: 7304, par: 72, designer: "Dick Phelps", established: 1999,
+    amenities: ["Practice Range", "Wetland Holes", "Clubhouse Dining", "Pro Shop", "GPS Carts"],
   },
 };
 
-const mkAuctions = (): Auction[] => {
-  let id = 1;
-  const out: Auction[] = [];
-  for (const courseId of Object.keys(TEE_TIMES_BY_COURSE).map(Number)) {
-    const { date, slots } = TEE_TIMES_BY_COURSE[courseId];
-    for (const s of slots) {
-      out.push({ id: id++, courseId, date, ...s });
-    }
-  }
-  return out;
+const FALLBACK_IMAGES = [
+  "https://images.unsplash.com/photo-1587174486073-ae5e5cff23aa?w=600&h=400&fit=crop",
+  "https://images.unsplash.com/photo-1535131749006-b7f58c99034b?w=600&h=400&fit=crop",
+  "https://images.unsplash.com/photo-1592919505780-303950717480?w=600&h=400&fit=crop",
+  "https://images.unsplash.com/photo-1587174486073-ae5e5cff23aa?w=600&h=400&fit=crop",
+];
+
+/* Populated from the database before the marketplace renders. */
+let COURSES: Course[] = [];
+
+const shortLoc = (loc: string | null) => {
+  if (!loc) return "Dallas · DFW";
+  const parts = loc.split(",").map(p => p.trim());
+  if (parts.length >= 2) return `${parts[parts.length - 2]} · DFW`;
+  return `${parts[0]} · DFW`;
 };
+
+const fmtTime = (t: string) => {
+  const [hStr, mStr] = t.split(":");
+  let h = parseInt(hStr, 10);
+  const suffix = h >= 12 ? "PM" : "AM";
+  h = h % 12 === 0 ? 12 : h % 12;
+  return `${h}:${mStr} ${suffix}`;
+};
+
+const fmtDate = (d: string) => {
+  const [y, m, day] = d.split("-").map(Number);
+  return new Date(y, m - 1, day).toLocaleDateString("en-US", {
+    weekday: "short", month: "short", day: "numeric",
+  });
+};
+
+const toCourse = (row: any, i: number): Course => {
+  const p = COURSE_PRESENTATION[row.slug] || {};
+  return {
+    id: row.id,
+    name: row.name,
+    short: p.short || row.name,
+    loc: shortLoc(row.location),
+    desc: p.desc || "Premium tee times released to live auction.",
+    longDesc: p.longDesc || "Live auction inventory released directly by the course. Bid against the market to secure this tee time below rack rate.",
+    rack: Number(row.rack_rate_default) || 0,
+    img: p.img || FALLBACK_IMAGES[i % FALLBACK_IMAGES.length],
+    tag: p.tag || "DFW",
+    yardage: p.yardage || 6900,
+    par: p.par || 72,
+    designer: p.designer || "—",
+    established: p.established || 0,
+    amenities: p.amenities || ["Practice Range", "Pro Shop", "Cart Fleet"],
+  };
+};
+
+const toAuction = (row: any): Auction => ({
+  id: row.id,
+  courseId: row.course_id,
+  date: fmtDate(row.tee_date),
+  time: fmtTime(row.tee_time),
+  players: row.players,
+  bid: Number(row.current_bid ?? row.floor_price),
+  bids: row.bid_count ?? 0,
+  endsIn: Math.max(0, Math.round((new Date(row.ends_at).getTime() - Date.now()) / 1000)),
+});
+
+async function loadMarketplace(): Promise<{ courses: Course[]; auctions: Auction[] }> {
+  const [courseRes, auctionRes] = await Promise.all([
+    (supabase as any)
+      .from("courses")
+      .select("id, name, slug, location, rack_rate_default")
+      .eq("active", true)
+      .order("name"),
+    (supabase as any)
+      .from("auctions")
+      .select("id, course_id, tee_date, tee_time, players, rack_rate, floor_price, current_bid, bid_count, status, ends_at")
+      .eq("status", "live"),
+  ]);
+
+  if (courseRes.error) throw courseRes.error;
+  if (auctionRes.error) throw auctionRes.error;
+
+  const courses = (courseRes.data || []).map(toCourse);
+  const courseIds = new Set(courses.map(c => c.id));
+  const auctions = (auctionRes.data || [])
+    .slice()
+    .sort((a: any, b: any) =>
+      `${a.tee_date}T${a.tee_time}`.localeCompare(`${b.tee_date}T${b.tee_time}`))
+    .map(toAuction)
+    .filter((a: Auction) => courseIds.has(a.courseId));
+
+  return { courses, auctions };
+}
 
 const BIDDER_NAMES = ["J. Morrison", "A. Patel", "T. Walker", "R. Chen", "S. Davis", "M. Thompson", "K. Wright", "D. Garcia"];
 
@@ -263,7 +297,7 @@ const BIDDER_NAMES = ["J. Morrison", "A. Patel", "T. Walker", "R. Chen", "S. Dav
 
 interface BidEvent {
   id: number;
-  auctionId: number;
+  auctionId: string;
   type: string;
   amount: number;
   bidder: string;
@@ -271,7 +305,7 @@ interface BidEvent {
 }
 
 interface OutbidAlert {
-  auctionId: number;
+  auctionId: string;
   newBid: number;
   bidder: string;
 }
@@ -280,7 +314,7 @@ function useLiveAuctions(initial: Auction[]) {
   const [auctions, setAuctions] = useState(initial);
   const [events, setEvents] = useState<BidEvent[]>([]);
   const [outbidAlert, setOutbidAlert] = useState<OutbidAlert | null>(null);
-  const userBidsRef = useRef<Record<number, number>>({});
+  const userBidsRef = useRef<Record<string, number>>({});
 
   useEffect(() => {
     const fire = () => {
@@ -328,7 +362,7 @@ function useLiveAuctions(initial: Auction[]) {
     return () => clearInterval(tick);
   }, []);
 
-  const placeBid = useCallback((auctionId: number, amount: number) => {
+  const placeBid = useCallback((auctionId: string, amount: number) => {
     userBidsRef.current[auctionId] = amount;
     const event: BidEvent = { id: Date.now(), auctionId, type: "user_bid", amount, bidder: "You", ts: Date.now() };
     setEvents(ev => [event, ...ev.slice(0, 29)]);
@@ -698,7 +732,7 @@ function BidModal({ auction, course, onClose, onConfirm }: {
   auction: Auction;
   course: Course;
   onClose: () => void;
-  onConfirm: (id: number, amt: number) => void;
+  onConfirm: (id: string, amt: number) => void;
 }) {
   const min = auction.bid + 5;
   const [amt, setAmt] = useState(Math.ceil((auction.bid + 25) / 25) * 25);
@@ -1077,7 +1111,7 @@ function SearchPage({ auctions, onBid }: { auctions: Auction[]; onBid: (a: Aucti
 function ProfilePage({ auctions, events, userBids }: {
   auctions: Auction[];
   events: BidEvent[];
-  userBids: Record<number, number>;
+  userBids: Record<string, number>;
 }) {
   const userAuctions = auctions.filter(a => userBids[a.id] !== undefined);
   const leading = userAuctions.filter(a => a._userLeading).length;
@@ -1356,13 +1390,68 @@ function MarketplacePage({ auctions, events, onBid }: {
 
 type Tab = "MARKET" | "SEARCH" | "PROFILE";
 
+function StatusScreen({ title, sub }: { title: string; sub: string }) {
+  return (
+    <>
+      <style>{css}</style>
+      <div style={{
+        minHeight: "100vh", background: "var(--bg)", display: "flex",
+        flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 14,
+      }}>
+        <div style={{
+          display: "flex", alignItems: "center", gap: 8,
+          fontFamily: "var(--mono)", fontSize: 11, letterSpacing: "1.5px", color: "var(--green)",
+        }}>
+          <div style={{
+            width: 6, height: 6, borderRadius: "50%",
+            background: "var(--green)", animation: "tsPulse 2s ease infinite",
+          }} />
+          TEESTRIKE
+        </div>
+        <div style={{
+          fontFamily: "var(--serif)", fontSize: 32, fontWeight: 300, color: "var(--white)",
+        }}>{title}</div>
+        <div style={{
+          fontFamily: "var(--mono)", fontSize: 12, color: "var(--dimmer)", letterSpacing: "0.5px",
+        }}>{sub}</div>
+      </div>
+    </>
+  );
+}
+
 export default function TeeStrike() {
-  const { auctions, events, outbidAlert, placeBid, userBidsRef } = useLiveAuctions(mkAuctions());
+  const [data, setData] = useState<{ courses: Course[]; auctions: Auction[] } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    loadMarketplace()
+      .then(res => {
+        if (cancelled) return;
+        COURSES = res.courses;
+        setData(res);
+      })
+      .catch(err => { if (!cancelled) setError(err.message || "Unable to load the marketplace."); });
+    return () => { cancelled = true; };
+  }, []);
+
+  if (error) return <StatusScreen title="Marketplace unavailable" sub={error} />;
+  if (!data) return <StatusScreen title="Loading the floor" sub="FETCHING LIVE AUCTIONS…" />;
+  if (!data.courses.length || !data.auctions.length) {
+    return <StatusScreen title="No live auctions" sub="CHECK BACK WHEN COURSES RELEASE NEW TEE TIMES" />;
+  }
+
+  return <TeeStrikeApp initialAuctions={data.auctions} />;
+}
+
+function TeeStrikeApp({ initialAuctions }: { initialAuctions: Auction[] }) {
+  const { auctions, events, outbidAlert, placeBid, userBidsRef } = useLiveAuctions(initialAuctions);
+
   const [bidTarget, setBidTarget] = useState<Auction | null>(null);
   const [dismissOutbid, setDismissOutbid] = useState(false);
   const [tab, setTab] = useState<Tab>("MARKET");
 
-  const handleConfirm = (id: number, amt: number) => {
+  const handleConfirm = (id: string, amt: number) => {
     placeBid(id, amt);
     setBidTarget(null);
   };
