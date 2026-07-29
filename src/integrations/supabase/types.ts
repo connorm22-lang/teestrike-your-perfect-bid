@@ -14,16 +14,363 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      auctions: {
+        Row: {
+          bid_count: number
+          bid_increment: number
+          buyer_premium_pct: number
+          course_id: string
+          created_at: string
+          current_bid: number | null
+          ends_at: string
+          final_price: number | null
+          floor_price: number
+          id: string
+          opens_at: string
+          players: number
+          rack_rate: number
+          slot_id: string | null
+          status: Database["public"]["Enums"]["auction_status"]
+          tee_date: string
+          tee_time: string
+          updated_at: string
+          winner_id: string | null
+        }
+        Insert: {
+          bid_count?: number
+          bid_increment?: number
+          buyer_premium_pct?: number
+          course_id: string
+          created_at?: string
+          current_bid?: number | null
+          ends_at: string
+          final_price?: number | null
+          floor_price: number
+          id?: string
+          opens_at: string
+          players: number
+          rack_rate: number
+          slot_id?: string | null
+          status?: Database["public"]["Enums"]["auction_status"]
+          tee_date: string
+          tee_time: string
+          updated_at?: string
+          winner_id?: string | null
+        }
+        Update: {
+          bid_count?: number
+          bid_increment?: number
+          buyer_premium_pct?: number
+          course_id?: string
+          created_at?: string
+          current_bid?: number | null
+          ends_at?: string
+          final_price?: number | null
+          floor_price?: number
+          id?: string
+          opens_at?: string
+          players?: number
+          rack_rate?: number
+          slot_id?: string | null
+          status?: Database["public"]["Enums"]["auction_status"]
+          tee_date?: string
+          tee_time?: string
+          updated_at?: string
+          winner_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "auctions_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "auctions_slot_id_fkey"
+            columns: ["slot_id"]
+            isOneToOne: false
+            referencedRelation: "tee_time_slots"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "auctions_winner_id_fkey"
+            columns: ["winner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bids: {
+        Row: {
+          amount: number
+          auction_id: string
+          bidder_id: string
+          created_at: string
+          id: string
+          status: Database["public"]["Enums"]["bid_status"]
+        }
+        Insert: {
+          amount: number
+          auction_id: string
+          bidder_id: string
+          created_at?: string
+          id?: string
+          status?: Database["public"]["Enums"]["bid_status"]
+        }
+        Update: {
+          amount?: number
+          auction_id?: string
+          bidder_id?: string
+          created_at?: string
+          id?: string
+          status?: Database["public"]["Enums"]["bid_status"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bids_auction_id_fkey"
+            columns: ["auction_id"]
+            isOneToOne: false
+            referencedRelation: "auctions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bids_bidder_id_fkey"
+            columns: ["bidder_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      courses: {
+        Row: {
+          active: boolean
+          admin_id: string
+          contact_email: string | null
+          created_at: string
+          id: string
+          location: string | null
+          market: string
+          name: string
+          rack_rate_default: number | null
+          slug: string
+          stripe_account_id: string | null
+          stripe_onboarded: boolean
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          admin_id: string
+          contact_email?: string | null
+          created_at?: string
+          id?: string
+          location?: string | null
+          market?: string
+          name: string
+          rack_rate_default?: number | null
+          slug: string
+          stripe_account_id?: string | null
+          stripe_onboarded?: boolean
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          admin_id?: string
+          contact_email?: string | null
+          created_at?: string
+          id?: string
+          location?: string | null
+          market?: string
+          name?: string
+          rack_rate_default?: number | null
+          slug?: string
+          stripe_account_id?: string | null
+          stripe_onboarded?: boolean
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "courses_admin_id_fkey"
+            columns: ["admin_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          email: string
+          full_name: string | null
+          id: string
+          phone: string | null
+          role: Database["public"]["Enums"]["user_role"]
+          stripe_customer_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          full_name?: string | null
+          id: string
+          phone?: string | null
+          role?: Database["public"]["Enums"]["user_role"]
+          stripe_customer_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          full_name?: string | null
+          id?: string
+          phone?: string | null
+          role?: Database["public"]["Enums"]["user_role"]
+          stripe_customer_id?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      tee_time_slots: {
+        Row: {
+          course_id: string
+          created_at: string
+          id: string
+          notes: string | null
+          players: number
+          rack_rate: number
+          tee_date: string
+          tee_time: string
+        }
+        Insert: {
+          course_id: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          players?: number
+          rack_rate: number
+          tee_date: string
+          tee_time: string
+        }
+        Update: {
+          course_id?: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          players?: number
+          rack_rate?: number
+          tee_date?: string
+          tee_time?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tee_time_slots_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      transactions: {
+        Row: {
+          auction_id: string
+          buyer_premium: number
+          captured_at: string | null
+          course_id: string
+          created_at: string
+          id: string
+          paid_out_at: string | null
+          status: Database["public"]["Enums"]["transaction_status"]
+          stripe_payment_intent_id: string | null
+          stripe_transfer_id: string | null
+          total_charged: number
+          winner_id: string
+          winning_bid: number
+        }
+        Insert: {
+          auction_id: string
+          buyer_premium: number
+          captured_at?: string | null
+          course_id: string
+          created_at?: string
+          id?: string
+          paid_out_at?: string | null
+          status?: Database["public"]["Enums"]["transaction_status"]
+          stripe_payment_intent_id?: string | null
+          stripe_transfer_id?: string | null
+          total_charged: number
+          winner_id: string
+          winning_bid: number
+        }
+        Update: {
+          auction_id?: string
+          buyer_premium?: number
+          captured_at?: string | null
+          course_id?: string
+          created_at?: string
+          id?: string
+          paid_out_at?: string | null
+          status?: Database["public"]["Enums"]["transaction_status"]
+          stripe_payment_intent_id?: string | null
+          stripe_transfer_id?: string | null
+          total_charged?: number
+          winner_id?: string
+          winning_bid?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transactions_auction_id_fkey"
+            columns: ["auction_id"]
+            isOneToOne: true
+            referencedRelation: "auctions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_winner_id_fkey"
+            columns: ["winner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      close_auction: { Args: { p_auction_id: string }; Returns: Json }
+      place_bid: {
+        Args: { p_amount: number; p_auction_id: string; p_bidder_id: string }
+        Returns: Json
+      }
     }
     Enums: {
-      [_ in never]: never
+      auction_status:
+        | "draft"
+        | "scheduled"
+        | "live"
+        | "closing"
+        | "closed"
+        | "cancelled"
+      bid_status: "active" | "outbid" | "won" | "refunded"
+      transaction_status:
+        | "pending"
+        | "captured"
+        | "paid_out"
+        | "refunded"
+        | "failed"
+      user_role: "golfer" | "course_admin" | "teestrike_admin"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +497,24 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      auction_status: [
+        "draft",
+        "scheduled",
+        "live",
+        "closing",
+        "closed",
+        "cancelled",
+      ],
+      bid_status: ["active", "outbid", "won", "refunded"],
+      transaction_status: [
+        "pending",
+        "captured",
+        "paid_out",
+        "refunded",
+        "failed",
+      ],
+      user_role: ["golfer", "course_admin", "teestrike_admin"],
+    },
   },
 } as const
