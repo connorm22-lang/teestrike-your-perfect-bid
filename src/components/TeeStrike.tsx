@@ -310,49 +310,69 @@ interface OutbidAlert {
   bidder: string;
 }
 
-function useLiveAuctions(initial: Auction[]) {
+export interface BidResult { ok: boolean; message?: string }
+
+function useLiveAuctions(initial: Auction[], userId: string | null) {
   const [auctions, setAuctions] = useState(initial);
   const [events, setEvents] = useState<BidEvent[]>([]);
   const [outbidAlert, setOutbidAlert] = useState<OutbidAlert | null>(null);
   const userBidsRef = useRef<Record<string, number>>({});
+  const userIdRef = useRef<string | null>(userId);
+  userIdRef.current = userId;
 
+  /* Realtime: auctions table drives current bid / bid count / status. */
   useEffect(() => {
-    const fire = () => {
-      setAuctions(prev => {
-        const liveAuctions = prev.filter(a => a.endsIn > 60);
-        if (!liveAuctions.length) return prev;
+    const channel = supabase
+      .channel("ts-auctions")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "auctions" },
+        (payload: any) => {
+          const row = payload.new;
+          if (!row?.id) return;
 
-        const weights = liveAuctions.map(a => a.endsIn < 3600 ? 3 : 1);
-        const total = weights.reduce((s, w) => s + w, 0);
-        let r = Math.random() * total;
-        let target = liveAuctions[0];
-        for (let i = 0; i < liveAuctions.length; i++) {
-          r -= weights[i];
-          if (r <= 0) { target = liveAuctions[i]; break; }
+          setAuctions(prev => {
+            const existing = prev.find(a => a.id === row.id);
+            if (!existing) return prev;
+
+            const nextBid = Number(row.current_bid ?? row.floor_price);
+            const isUser = !!userIdRef.current && row.winner_id === userIdRef.current;
+            const changed = nextBid !== existing.bid || (row.bid_count ?? 0) !== existing.bids;
+
+            if (changed && !isUser) {
+              const mine = userBidsRef.current[row.id];
+              if (mine !== undefined && nextBid > mine) {
+                setOutbidAlert({ auctionId: row.id, newBid: nextBid, bidder: "Another bidder" });
+                setTimeout(() => setOutbidAlert(null), 6000);
+              }
+              setEvents(ev => [{
+                id: Date.now() + Math.random(), auctionId: row.id, type: "bid",
+                amount: nextBid, bidder: "Another bidder", ts: Date.now(),
+              }, ...ev.slice(0, 29)]);
+            }
+
+            if (row.status && row.status !== "live" && row.status !== "closing") {
+              return prev.filter(a => a.id !== row.id);
+            }
+
+            return prev.map(a => a.id === row.id ? {
+              ...a,
+              bid: nextBid,
+              bids: row.bid_count ?? a.bids,
+              endsIn: row.ends_at
+                ? Math.max(0, Math.round((new Date(row.ends_at).getTime() - Date.now()) / 1000))
+                : a.endsIn,
+              _flash: changed,
+              _userLeading: isUser,
+            } : a);
+          });
+
+          setTimeout(() => setAuctions(prev => prev.map(a => ({ ...a, _flash: false }))), 800);
         }
+      )
+      .subscribe();
 
-        const increment = [10, 15, 20, 25, 25, 25, 50][Math.floor(Math.random() * 7)];
-        const newBid = target.bid + increment;
-        const bidder = BIDDER_NAMES[Math.floor(Math.random() * BIDDER_NAMES.length)];
-
-        const userBid = userBidsRef.current[target.id];
-        if (userBid && newBid > userBid) {
-          setOutbidAlert({ auctionId: target.id, newBid, bidder });
-          setTimeout(() => setOutbidAlert(null), 5000);
-        }
-
-        const event: BidEvent = { id: Date.now() + Math.random(), auctionId: target.id, type: "bid", amount: newBid, bidder, ts: Date.now() };
-        setEvents(ev => [event, ...ev.slice(0, 29)]);
-
-        return prev.map(a => a.id === target.id
-          ? { ...a, bid: newBid, bids: a.bids + 1, _flash: true }
-          : a
-        );
-      });
-      setTimeout(() => setAuctions(prev => prev.map(a => ({ ...a, _flash: false }))), 800);
-    };
-    const interval = setInterval(fire, 2800 + Math.random() * 3200);
-    return () => clearInterval(interval);
+    return () => { supabase.removeChannel(channel); };
   }, []);
 
   useEffect(() => {
@@ -362,19 +382,157 @@ function useLiveAuctions(initial: Auction[]) {
     return () => clearInterval(tick);
   }, []);
 
-  const placeBid = useCallback((auctionId: string, amount: number) => {
+  const placeBid = useCallback(async (auctionId: string, amount: number): Promise<BidResult> => {
+    const bidderId = userIdRef.current;
+    if (!bidderId) return { ok: false, message: "Sign in to place a bid" };
+
+    const prevSnapshot = { ...userBidsRef.current };
+    const { data, error } = await (supabase as any).rpc("place_bid", {
+      p_auction_id: auctionId,
+      p_bidder_id: bidderId,
+      p_amount: amount,
+    });
+
+    if (error) {
+      userBidsRef.current = prevSnapshot;
+      return { ok: false, message: "Couldn't place bid, try again" };
+    }
+
+    const res = (typeof data === "string" ? JSON.parse(data) : data) as any;
+
+    if (!res?.success) {
+      const code = res?.error_code;
+      const message =
+        code === "BID_TOO_LOW" ? `Minimum bid is $${res.min_bid}` :
+        code === "ALREADY_LEADING" ? "You're already the top bid on this tee time" :
+        (code === "AUCTION_ENDED" || code === "AUCTION_NOT_LIVE") ? "This auction has closed" :
+        "Couldn't place bid, try again";
+      return { ok: false, message };
+    }
+
     userBidsRef.current[auctionId] = amount;
-    const event: BidEvent = { id: Date.now(), auctionId, type: "user_bid", amount, bidder: "You", ts: Date.now() };
-    setEvents(ev => [event, ...ev.slice(0, 29)]);
+    setEvents(ev => [{
+      id: Date.now(), auctionId, type: "user_bid", amount, bidder: "You", ts: Date.now(),
+    }, ...ev.slice(0, 29)]);
     setAuctions(prev => prev.map(a => a.id === auctionId
       ? { ...a, bid: amount, bids: a.bids + 1, _flash: true, _userLeading: true }
       : a
     ));
     setTimeout(() => setAuctions(prev => prev.map(a => ({ ...a, _flash: false }))), 800);
+    return { ok: true };
   }, []);
 
   return { auctions, events, outbidAlert, placeBid, userBidsRef };
 }
+
+/* ── AUTH ───────────────────────────────────────────────── */
+
+function useAuthSession() {
+  const [session, setSession] = useState<any>(null);
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => setSession(s));
+    supabase.auth.getSession().then(({ data }) => { setSession(data.session); setReady(true); });
+    return () => sub.subscription.unsubscribe();
+  }, []);
+
+  return { session, ready, user: session?.user ?? null };
+}
+
+function AuthPanel({ onClose, compact }: { onClose?: () => void; compact?: boolean }) {
+  const [mode, setMode] = useState<"in" | "up">("in");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [err, setErr] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const submit = async () => {
+    setErr(null);
+    setBusy(true);
+    const fn = mode === "in"
+      ? supabase.auth.signInWithPassword({ email, password })
+      : supabase.auth.signUp({ email, password, options: { emailRedirectTo: window.location.origin } });
+    const { error } = await fn;
+    setBusy(false);
+    if (error) { setErr(error.message); return; }
+    onClose?.();
+  };
+
+  const field: React.CSSProperties = {
+    width: "100%", padding: "12px 14px", marginTop: 10,
+    background: "rgba(255,255,255,0.04)", border: "1px solid var(--border)",
+    borderRadius: 8, color: "var(--white)", fontFamily: "var(--mono)", fontSize: 13,
+  };
+
+  return (
+    <div style={{
+      background: "var(--card)", border: "1px solid var(--border-h)",
+      borderRadius: 14, padding: "26px 24px",
+      maxWidth: compact ? 420 : 460, margin: "0 auto", width: "100%",
+    }}>
+      <div style={{ fontFamily: "var(--serif)", fontSize: 26, fontWeight: 600 }}>
+        {mode === "in" ? "Sign in to bid" : "Create your account"}
+      </div>
+      <div style={{ fontFamily: "var(--mono)", fontSize: 11, color: "var(--dimmer)", letterSpacing: "1px", marginTop: 6 }}>
+        {mode === "in" ? "MEMBER ACCESS" : "NEW MEMBER"}
+      </div>
+
+      <input style={field} type="email" placeholder="Email" value={email}
+        onChange={e => setEmail(e.target.value)} autoComplete="email" />
+      <input style={field} type="password" placeholder="Password" value={password}
+        onChange={e => setPassword(e.target.value)}
+        autoComplete={mode === "in" ? "current-password" : "new-password"}
+        onKeyDown={e => { if (e.key === "Enter") submit(); }} />
+
+      {err && (
+        <div style={{
+          marginTop: 12, fontFamily: "var(--mono)", fontSize: 11.5,
+          color: "var(--red)", lineHeight: 1.5,
+        }}>{err}</div>
+      )}
+
+      <button onClick={submit} disabled={busy || !email || !password} style={{
+        width: "100%", marginTop: 16, padding: "13px",
+        background: "linear-gradient(135deg, var(--gold), #b89a3e)",
+        color: "#0a0a0a", border: "none", borderRadius: 8,
+        fontFamily: "var(--mono)", fontSize: 12.5, letterSpacing: "1.5px", fontWeight: 600,
+        opacity: busy || !email || !password ? 0.5 : 1,
+      }}>
+        {busy ? "…" : mode === "in" ? "SIGN IN" : "SIGN UP"}
+      </button>
+
+      <button onClick={() => { setErr(null); setMode(mode === "in" ? "up" : "in"); }} style={{
+        width: "100%", marginTop: 12, background: "none", border: "none",
+        color: "var(--dim)", fontFamily: "var(--mono)", fontSize: 11, letterSpacing: "1px",
+      }}>
+        {mode === "in" ? "NEED AN ACCOUNT? SIGN UP" : "ALREADY A MEMBER? SIGN IN"}
+      </button>
+
+      {onClose && (
+        <button onClick={onClose} style={{
+          width: "100%", marginTop: 6, background: "none", border: "none",
+          color: "var(--dimmer)", fontFamily: "var(--mono)", fontSize: 10.5, letterSpacing: "1px",
+        }}>CANCEL</button>
+      )}
+    </div>
+  );
+}
+
+function AuthModal({ onClose }: { onClose: () => void }) {
+  return (
+    <div onClick={onClose} style={{
+      position: "fixed", inset: 0, zIndex: 120,
+      background: "rgba(0,0,0,0.75)", backdropFilter: "blur(8px)",
+      display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
+    }}>
+      <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: 440 }}>
+        <AuthPanel onClose={onClose} compact />
+      </div>
+    </div>
+  );
+}
+
 
 /* ── COUNTDOWN ──────────────────────────────────────────── */
 
