@@ -898,6 +898,8 @@ function BidModal({ auction, course, onClose, onConfirm }: {
   const [caddie, setCaddie] = useState<string | null>(null);
   const [cLoading, setCLoading] = useState(false);
   const [done, setDone] = useState(false);
+  const [bidErr, setBidErr] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
   const premium = Math.round((amt / course.rack - 1) * 100);
@@ -918,7 +920,16 @@ function BidModal({ auction, course, onClose, onConfirm }: {
     return () => clearTimeout(debounceRef.current);
   }, [amt, course, auction]);
 
-  const confirm = () => { onConfirm(auction.id, amt); setDone(true); };
+  const confirm = async () => {
+    if (submitting) return;
+    setBidErr(null);
+    setSubmitting(true);
+    const res = await onConfirm(auction.id, amt);
+    setSubmitting(false);
+    if (res.ok) setDone(true);
+    else setBidErr(res.message || "Couldn't place bid, try again");
+  };
+
 
   return (
     <div onClick={onClose} style={{
