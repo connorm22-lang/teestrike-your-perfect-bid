@@ -1388,8 +1388,63 @@ function MarketplacePage({ auctions, events, onBid }: {
 
 type Tab = "MARKET" | "SEARCH" | "PROFILE";
 
+function StatusScreen({ title, sub }: { title: string; sub: string }) {
+  return (
+    <>
+      <style>{css}</style>
+      <div style={{
+        minHeight: "100vh", background: "var(--bg)", display: "flex",
+        flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 14,
+      }}>
+        <div style={{
+          display: "flex", alignItems: "center", gap: 8,
+          fontFamily: "var(--mono)", fontSize: 11, letterSpacing: "1.5px", color: "var(--green)",
+        }}>
+          <div style={{
+            width: 6, height: 6, borderRadius: "50%",
+            background: "var(--green)", animation: "tsPulse 2s ease infinite",
+          }} />
+          TEESTRIKE
+        </div>
+        <div style={{
+          fontFamily: "var(--serif)", fontSize: 32, fontWeight: 300, color: "var(--white)",
+        }}>{title}</div>
+        <div style={{
+          fontFamily: "var(--mono)", fontSize: 12, color: "var(--dimmer)", letterSpacing: "0.5px",
+        }}>{sub}</div>
+      </div>
+    </>
+  );
+}
+
 export default function TeeStrike() {
-  const { auctions, events, outbidAlert, placeBid, userBidsRef } = useLiveAuctions(mkAuctions());
+  const [data, setData] = useState<{ courses: Course[]; auctions: Auction[] } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    loadMarketplace()
+      .then(res => {
+        if (cancelled) return;
+        COURSES = res.courses;
+        setData(res);
+      })
+      .catch(err => { if (!cancelled) setError(err.message || "Unable to load the marketplace."); });
+    return () => { cancelled = true; };
+  }, []);
+
+  if (error) return <StatusScreen title="Marketplace unavailable" sub={error} />;
+  if (!data) return <StatusScreen title="Loading the floor" sub="FETCHING LIVE AUCTIONS…" />;
+  if (!data.courses.length || !data.auctions.length) {
+    return <StatusScreen title="No live auctions" sub="CHECK BACK WHEN COURSES RELEASE NEW TEE TIMES" />;
+  }
+
+  return <TeeStrikeApp initialAuctions={data.auctions} />;
+}
+
+function TeeStrikeApp({ initialAuctions }: { initialAuctions: Auction[] }) {
+  const { auctions, events, outbidAlert, placeBid, userBidsRef } = useLiveAuctions(initialAuctions);
+
   const [bidTarget, setBidTarget] = useState<Auction | null>(null);
   const [dismissOutbid, setDismissOutbid] = useState(false);
   const [tab, setTab] = useState<Tab>("MARKET");
