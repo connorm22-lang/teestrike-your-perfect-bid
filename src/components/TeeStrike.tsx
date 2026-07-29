@@ -1701,7 +1701,7 @@ function TeeStrikeApp({ initialAuctions }: { initialAuctions: Auction[] }) {
               LIVE
             </div>
             <button
-              onClick={() => setTab("PROFILE")}
+              onClick={() => (user ? setTab("PROFILE") : setShowAuth(true))}
               style={{
                 width: 32, height: 32, borderRadius: "50%",
                 background: "var(--fairway)", display: "flex",
@@ -1709,7 +1709,7 @@ function TeeStrikeApp({ initialAuctions }: { initialAuctions: Auction[] }) {
                 fontFamily: "var(--mono)", fontSize: 12, color: "var(--gold)",
                 border: "1px solid var(--border-h)",
               }}>
-              TS
+              {user ? (user.email || "TS").slice(0, 2).toUpperCase() : "IN"}
             </button>
           </div>
         </nav>
@@ -1720,14 +1720,14 @@ function TeeStrikeApp({ initialAuctions }: { initialAuctions: Auction[] }) {
           <OutbidBanner
             alert={outbidAlert}
             auctions={auctions}
-            onRebid={(a) => { setBidTarget(a); setDismissOutbid(true); }}
+            onRebid={(a) => { requestBid(a); setDismissOutbid(true); }}
             onDismiss={() => setDismissOutbid(true)}
           />
         )}
 
-        {tab === "MARKET" && <MarketplacePage auctions={auctions} events={events} onBid={setBidTarget} />}
-        {tab === "SEARCH" && <SearchPage auctions={auctions} onBid={setBidTarget} />}
-        {tab === "PROFILE" && <ProfilePage auctions={auctions} events={events} userBids={userBidsRef.current} />}
+        {tab === "MARKET" && <MarketplacePage auctions={auctions} events={events} onBid={requestBid} />}
+        {tab === "SEARCH" && <SearchPage auctions={auctions} onBid={requestBid} />}
+        {tab === "PROFILE" && <ProfilePage auctions={auctions} events={events} userBids={userBidsRef.current} user={user} />}
       </div>
 
       <style>{`
@@ -1735,6 +1735,8 @@ function TeeStrikeApp({ initialAuctions }: { initialAuctions: Auction[] }) {
           .feed-sidebar { display: block !important; }
         }
       `}</style>
+
+      {showAuth && <AuthModal onClose={() => setShowAuth(false)} />}
 
       {bidAuction && (
         <BidModal
@@ -1744,6 +1746,7 @@ function TeeStrikeApp({ initialAuctions }: { initialAuctions: Auction[] }) {
           onConfirm={handleConfirm}
         />
       )}
+
     </>
   );
 }
