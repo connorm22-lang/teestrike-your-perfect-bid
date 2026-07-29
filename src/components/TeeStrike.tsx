@@ -730,7 +730,7 @@ function BidModal({ auction, course, onClose, onConfirm }: {
   auction: Auction;
   course: Course;
   onClose: () => void;
-  onConfirm: (id: number, amt: number) => void;
+  onConfirm: (id: string, amt: number) => void;
 }) {
   const min = auction.bid + 5;
   const [amt, setAmt] = useState(Math.ceil((auction.bid + 25) / 25) * 25);
@@ -1109,7 +1109,7 @@ function SearchPage({ auctions, onBid }: { auctions: Auction[]; onBid: (a: Aucti
 function ProfilePage({ auctions, events, userBids }: {
   auctions: Auction[];
   events: BidEvent[];
-  userBids: Record<number, number>;
+  userBids: Record<string, number>;
 }) {
   const userAuctions = auctions.filter(a => userBids[a.id] !== undefined);
   const leading = userAuctions.filter(a => a._userLeading).length;
