@@ -1638,21 +1638,29 @@ export default function TeeStrike() {
 }
 
 function TeeStrikeApp({ initialAuctions }: { initialAuctions: Auction[] }) {
-  const { auctions, events, outbidAlert, placeBid, userBidsRef } = useLiveAuctions(initialAuctions);
+  const { user } = useAuthSession();
+  const { auctions, events, outbidAlert, placeBid, userBidsRef } = useLiveAuctions(initialAuctions, user?.id ?? null);
 
   const [bidTarget, setBidTarget] = useState<Auction | null>(null);
   const [dismissOutbid, setDismissOutbid] = useState(false);
   const [tab, setTab] = useState<Tab>("MARKET");
+  const [showAuth, setShowAuth] = useState(false);
 
-  const handleConfirm = (id: string, amt: number) => {
-    placeBid(id, amt);
-    setBidTarget(null);
+  const requestBid = (a: Auction) => {
+    if (!user) { setShowAuth(true); return; }
+    setBidTarget(a);
+  };
+
+  const handleConfirm = async (id: string, amt: number): Promise<BidResult> => {
+    if (!user) { setBidTarget(null); setShowAuth(true); return { ok: false, message: "Sign in to place a bid" }; }
+    return placeBid(id, amt);
   };
 
   const bidAuction = bidTarget ? auctions.find(a => a.id === bidTarget.id) : null;
   const showOutbid = outbidAlert && !dismissOutbid;
 
   useEffect(() => { if (outbidAlert) setDismissOutbid(false); }, [outbidAlert]);
+
 
   return (
     <>
