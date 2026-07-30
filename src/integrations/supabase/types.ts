@@ -200,6 +200,67 @@ export type Database = {
           },
         ]
       }
+      credits: {
+        Row: {
+          amount: number
+          created_at: string
+          expires_at: string
+          id: string
+          reason: string
+          redeemed_at: string | null
+          redeemed_transaction_id: string | null
+          source_auction_id: string | null
+          status: Database["public"]["Enums"]["credit_status"]
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          expires_at: string
+          id?: string
+          reason?: string
+          redeemed_at?: string | null
+          redeemed_transaction_id?: string | null
+          source_auction_id?: string | null
+          status?: Database["public"]["Enums"]["credit_status"]
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          expires_at?: string
+          id?: string
+          reason?: string
+          redeemed_at?: string | null
+          redeemed_transaction_id?: string | null
+          source_auction_id?: string | null
+          status?: Database["public"]["Enums"]["credit_status"]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "credits_redeemed_transaction_id_fkey"
+            columns: ["redeemed_transaction_id"]
+            isOneToOne: false
+            referencedRelation: "transactions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "credits_source_auction_id_fkey"
+            columns: ["source_auction_id"]
+            isOneToOne: false
+            referencedRelation: "auctions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "credits_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string
@@ -232,6 +293,74 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      second_chance_offers: {
+        Row: {
+          cascade_rank: number
+          claimed_transaction_id: string | null
+          created_at: string
+          expires_at: string
+          id: string
+          loser_id: string
+          offered_auction_id: string
+          price: number
+          source_auction_id: string
+          status: Database["public"]["Enums"]["offer_status"]
+        }
+        Insert: {
+          cascade_rank?: number
+          claimed_transaction_id?: string | null
+          created_at?: string
+          expires_at: string
+          id?: string
+          loser_id: string
+          offered_auction_id: string
+          price: number
+          source_auction_id: string
+          status?: Database["public"]["Enums"]["offer_status"]
+        }
+        Update: {
+          cascade_rank?: number
+          claimed_transaction_id?: string | null
+          created_at?: string
+          expires_at?: string
+          id?: string
+          loser_id?: string
+          offered_auction_id?: string
+          price?: number
+          source_auction_id?: string
+          status?: Database["public"]["Enums"]["offer_status"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "second_chance_offers_claimed_transaction_id_fkey"
+            columns: ["claimed_transaction_id"]
+            isOneToOne: false
+            referencedRelation: "transactions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "second_chance_offers_loser_id_fkey"
+            columns: ["loser_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "second_chance_offers_offered_auction_id_fkey"
+            columns: ["offered_auction_id"]
+            isOneToOne: false
+            referencedRelation: "auctions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "second_chance_offers_source_auction_id_fkey"
+            columns: ["source_auction_id"]
+            isOneToOne: false
+            referencedRelation: "auctions"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       tee_time_slots: {
         Row: {
@@ -281,6 +410,7 @@ export type Database = {
           captured_at: string | null
           course_id: string
           created_at: string
+          credit_applied: number
           id: string
           paid_out_at: string | null
           status: Database["public"]["Enums"]["transaction_status"]
@@ -296,6 +426,7 @@ export type Database = {
           captured_at?: string | null
           course_id: string
           created_at?: string
+          credit_applied?: number
           id?: string
           paid_out_at?: string | null
           status?: Database["public"]["Enums"]["transaction_status"]
@@ -311,6 +442,7 @@ export type Database = {
           captured_at?: string | null
           course_id?: string
           created_at?: string
+          credit_applied?: number
           id?: string
           paid_out_at?: string | null
           status?: Database["public"]["Enums"]["transaction_status"]
@@ -349,10 +481,27 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      claim_second_chance: {
+        Args: { p_offer_id: string; p_user_id: string }
+        Returns: Json
+      }
       close_auction: { Args: { p_auction_id: string }; Returns: Json }
+      close_due_auctions: { Args: never; Returns: number }
+      decline_second_chance: {
+        Args: { p_offer_id: string; p_user_id: string }
+        Returns: Json
+      }
+      offer_next_loser: {
+        Args: { p_offered: string; p_rank: number; p_source: string }
+        Returns: undefined
+      }
       place_bid: {
         Args: { p_amount: number; p_auction_id: string; p_bidder_id: string }
         Returns: Json
+      }
+      redeem_available_credit: {
+        Args: { p_premium: number; p_tx: string; p_user_id: string }
+        Returns: number
       }
     }
     Enums: {
@@ -364,6 +513,8 @@ export type Database = {
         | "closed"
         | "cancelled"
       bid_status: "active" | "outbid" | "won" | "refunded"
+      credit_status: "active" | "redeemed" | "expired"
+      offer_status: "pending" | "claimed" | "declined" | "expired"
       transaction_status:
         | "pending"
         | "captured"
@@ -507,6 +658,8 @@ export const Constants = {
         "cancelled",
       ],
       bid_status: ["active", "outbid", "won", "refunded"],
+      credit_status: ["active", "redeemed", "expired"],
+      offer_status: ["pending", "claimed", "declined", "expired"],
       transaction_status: [
         "pending",
         "captured",
