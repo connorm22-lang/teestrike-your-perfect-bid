@@ -1643,6 +1643,8 @@ export default function TeeStrike() {
 
 function TeeStrikeApp({ initialAuctions }: { initialAuctions: Auction[] }) {
   const { user } = useAuthSession();
+  const { offer: secondChance, close: closeSecondChance } = useSecondChanceOffer(user?.id ?? null);
+
   const { auctions, events, outbidAlert, placeBid, userBidsRef } = useLiveAuctions(initialAuctions, user?.id ?? null);
 
   const [bidTarget, setBidTarget] = useState<Auction | null>(null);
