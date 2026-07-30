@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useSecondChanceOffer, SecondChanceModal, CreditBalance } from "./rewards";
 
 /* ─────────────────────────────────────────────────────────────
    DESIGN SYSTEM  
