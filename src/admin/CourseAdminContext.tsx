@@ -1,8 +1,8 @@
-import { createContext, useContext, useState, ReactNode, useCallback, useEffect } from "react";
+import { createContext, useContext, useState, ReactNode, useCallback, useEffect, useMemo } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 
-type CourseRow = {
+export type CourseRow = {
   id: string;
   name: string;
   slug: string;
@@ -11,10 +11,15 @@ type CourseRow = {
   contact_email: string | null;
 };
 
+const STORAGE_KEY = "teestrike.admin.selectedCourseId";
+
 type AdminState = {
   loading: boolean;
   session: Session | null;
   isAuthenticated: boolean;
+  courses: CourseRow[];
+  selectedCourseId: string | null;
+  setSelectedCourse: (id: string) => void;
   courseId: string | null;
   courseName: string;
   courseLocation: string;
@@ -39,9 +44,10 @@ const NOT_AUTHORIZED = "Those credentials don't match a course account.";
 export function CourseAdminProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [session, setSession] = useState<Session | null>(null);
-  const [course, setCourse] = useState<CourseRow | null>(null);
+  const [courses, setCourses] = useState<CourseRow[]>([]);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  const loadCourse = useCallback(async (userId: string) => {
+  const loadCourses = useCallback(async (userId: string) => {
     const { data: profile } = await supabase
       .from("profiles")
       .select("id, role")
@@ -49,20 +55,29 @@ export function CourseAdminProvider({ children }: { children: ReactNode }) {
       .maybeSingle();
 
     if (!profile || profile.role !== "course_admin") {
-      setCourse(null);
-      return null;
+      setCourses([]);
+      setSelectedId(null);
+      return [];
     }
 
-    const { data: courses } = await supabase
+    const { data } = await supabase
       .from("courses")
       .select("id, name, slug, location, rack_rate_default, contact_email")
       .eq("admin_id", userId)
-      .order("name")
-      .limit(1);
+      .order("name");
 
-    const row = (courses?.[0] as CourseRow | undefined) ?? null;
-    setCourse(row);
-    return row;
+    const rows = (data as CourseRow[] | null) ?? [];
+    setCourses(rows);
+
+    let stored: string | null = null;
+    try {
+      stored = localStorage.getItem(STORAGE_KEY);
+    } catch {
+      stored = null;
+    }
+    const next = rows.find((c) => c.id === stored)?.id ?? rows[0]?.id ?? null;
+    setSelectedId(next);
+    return rows;
   }, []);
 
   useEffect(() => {
@@ -72,12 +87,12 @@ export function CourseAdminProvider({ children }: { children: ReactNode }) {
       if (!active) return;
       setSession(s);
       if (!s) {
-        setCourse(null);
+        setCourses([]);
+        setSelectedId(null);
         setLoading(false);
       } else {
-        // defer supabase calls out of the auth callback
         setTimeout(() => {
-          loadCourse(s.user.id).finally(() => active && setLoading(false));
+          loadCourses(s.user.id).finally(() => active && setLoading(false));
         }, 0);
       }
     });
@@ -85,7 +100,7 @@ export function CourseAdminProvider({ children }: { children: ReactNode }) {
     supabase.auth.getSession().then(async ({ data }) => {
       if (!active) return;
       setSession(data.session);
-      if (data.session) await loadCourse(data.session.user.id);
+      if (data.session) await loadCourses(data.session.user.id);
       if (active) setLoading(false);
     });
 
@@ -93,25 +108,40 @@ export function CourseAdminProvider({ children }: { children: ReactNode }) {
       active = false;
       sub.subscription.unsubscribe();
     };
-  }, [loadCourse]);
+  }, [loadCourses]);
+
+  const setSelectedCourse = useCallback((id: string) => {
+    setSelectedId(id);
+    try {
+      localStorage.setItem(STORAGE_KEY, id);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  const course = useMemo(
+    () => courses.find((c) => c.id === selectedId) ?? courses[0] ?? null,
+    [courses, selectedId]
+  );
 
   const login = useCallback<AdminState["login"]>(
     async (email, password) => {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error || !data.user) return { ok: false, error: NOT_AUTHORIZED };
-      const row = await loadCourse(data.user.id);
-      if (!row) {
+      const rows = await loadCourses(data.user.id);
+      if (rows.length === 0) {
         await supabase.auth.signOut();
         return { ok: false, error: NOT_AUTHORIZED };
       }
       return { ok: true };
     },
-    [loadCourse]
+    [loadCourses]
   );
 
   const logout = useCallback(async () => {
     await supabase.auth.signOut();
-    setCourse(null);
+    setCourses([]);
+    setSelectedId(null);
   }, []);
 
   const updateProfile = useCallback<AdminState["updateProfile"]>(
@@ -138,7 +168,10 @@ export function CourseAdminProvider({ children }: { children: ReactNode }) {
         .maybeSingle();
 
       if (error) return { ok: false, error: error.message };
-      if (data) setCourse(data as CourseRow);
+      if (data) {
+        const row = data as CourseRow;
+        setCourses((prev) => prev.map((c) => (c.id === row.id ? row : c)));
+      }
       return { ok: true };
     },
     [course]
@@ -150,6 +183,9 @@ export function CourseAdminProvider({ children }: { children: ReactNode }) {
         loading,
         session,
         isAuthenticated: Boolean(session && course),
+        courses,
+        selectedCourseId: course?.id ?? null,
+        setSelectedCourse,
         courseId: course?.id ?? null,
         courseName: course?.name ?? "",
         courseLocation: course?.location ?? "",

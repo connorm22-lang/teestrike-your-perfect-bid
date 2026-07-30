@@ -85,6 +85,15 @@ export const adminCss = `
   font-family: var(--mono); font-size: 11px; letter-spacing: 0.2em;
   color: var(--dim); text-transform: uppercase;
 }
+.ts-admin .course-picker {
+  font-family: var(--mono); font-size: 11px; letter-spacing: 0.16em;
+  text-transform: uppercase; color: var(--gold);
+  background: var(--gold-bg); border: 1px solid var(--gold-dim);
+  padding: 7px 10px; border-radius: 2px; cursor: pointer; outline: none;
+}
+.ts-admin .course-picker:focus { border-color: var(--gold); }
+.ts-admin .course-picker option { background: #0b1a12; color: #e8e4dc; }
+
 
 .ts-admin .body { display: flex; flex: 1; }
 .ts-admin .sidebar {
