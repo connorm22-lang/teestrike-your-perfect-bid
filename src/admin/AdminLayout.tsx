@@ -77,8 +77,8 @@ export function AdminLayout() {
             </nav>
             <button
               className="logout"
-              onClick={() => {
-                logout();
+              onClick={async () => {
+                await logout();
                 navigate("/admin/login");
               }}
             >
