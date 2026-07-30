@@ -1,9 +1,15 @@
-import { useState, FormEvent, useMemo } from "react";
+import { useState, FormEvent, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useCourseAdmin } from "../CourseAdminContext";
 import { useAdminToast } from "../useToast";
+import { supabase } from "@/integrations/supabase/client";
 
 function pad(n: number) { return String(n).padStart(2, "0"); }
+
+function todayISO() {
+  const d = new Date();
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
 
 function tomorrowISO() {
   const d = new Date();
@@ -11,63 +17,94 @@ function tomorrowISO() {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
-function localDateTime(date: Date) {
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
-}
-
-function defaultAuctionEnd(teeDate: string) {
-  // 6 PM the night before tee time
-  if (!teeDate) return "";
-  const [y, m, d] = teeDate.split("-").map(Number);
-  const dt = new Date(y, m - 1, d - 1, 18, 0);
-  return localDateTime(dt);
-}
+const LENGTHS = [
+  { key: "1", label: "1 day", days: 1 },
+  { key: "3", label: "3 days", days: 3 },
+  { key: "7", label: "7 days", days: 7 },
+];
 
 export default function AdminNewSlotPage() {
   const navigate = useNavigate();
-  const { rackRateDefault } = useCourseAdmin();
+  const { rackRateDefault, courseId, courseName } = useCourseAdmin();
   const { showToast, toastNode } = useAdminToast();
 
   const [date, setDate] = useState(tomorrowISO());
   const [teeTime, setTeeTime] = useState("08:00");
   const [players, setPlayers] = useState(4);
   const [rack, setRack] = useState(rackRateDefault);
-  const [increment, setIncrement] = useState(5);
-  const [opensAt, setOpensAt] = useState(localDateTime(new Date()));
-  const [endsAt, setEndsAt] = useState(defaultAuctionEnd(tomorrowISO()));
-  const [notes, setNotes] = useState("");
+  const [length, setLength] = useState("3");
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [formError, setFormError] = useState("");
+  const [saving, setSaving] = useState(false);
 
-  // Re-default ends-at when tee date changes (only if user hasn't customized recently)
-  function onDateChange(v: string) {
-    setDate(v);
-    setEndsAt(defaultAuctionEnd(v));
-  }
+  useEffect(() => { setRack(rackRateDefault); }, [rackRateDefault, courseId]);
 
   const payoutAtRack = rack;
   const payoutAtPremium = useMemo(() => Math.round(rack * 1.3), [rack]);
 
-  function submit(e: FormEvent) {
+  async function submit(e: FormEvent) {
     e.preventDefault();
+    setFormError("");
     const next: Record<string, string> = {};
     if (!date) next.date = "Date is required";
+    else if (date < todayISO()) next.date = "Tee date must be today or later";
     if (!teeTime) next.teeTime = "Tee time is required";
     if (!rack || rack <= 0) next.rack = "Rack rate must be positive";
-    if (!opensAt) next.opensAt = "Opening time is required";
-    if (!endsAt) next.endsAt = "Closing time is required";
-    if (opensAt && endsAt && new Date(opensAt) >= new Date(endsAt)) {
-      next.endsAt = "Closing must be after opening";
-    }
+    if (!courseId) next.date = "No course selected";
     setErrors(next);
     if (Object.keys(next).length > 0) {
       showToast("Fix the errors below", "error");
       return;
     }
 
-    const opensReadable = new Date(opensAt).toLocaleString("en-US", {
-      hour: "numeric", minute: "2-digit", weekday: "short",
+    setSaving(true);
+    const days = LENGTHS.find((l) => l.key === length)?.days ?? 3;
+    const opensAt = new Date();
+    const endsAt = new Date(opensAt.getTime() + days * 24 * 60 * 60 * 1000);
+
+    const { data: slot, error: slotError } = await supabase
+      .from("tee_time_slots")
+      .insert({
+        course_id: courseId as string,
+        tee_date: date,
+        tee_time: teeTime,
+        players,
+        rack_rate: rack,
+      })
+      .select("id")
+      .single();
+
+    if (slotError || !slot) {
+      setSaving(false);
+      setFormError(slotError?.message ?? "Couldn't create the tee time slot.");
+      showToast("Couldn't create the tee time", "error");
+      return;
+    }
+
+    const { error: auctionError } = await supabase.from("auctions").insert({
+      slot_id: slot.id,
+      course_id: courseId as string,
+      tee_date: date,
+      tee_time: teeTime,
+      players,
+      rack_rate: rack,
+      floor_price: rack,
+      bid_increment: 5.0,
+      opens_at: opensAt.toISOString(),
+      ends_at: endsAt.toISOString(),
+      status: "live" as const,
+      buyer_premium_pct: 0.14,
     });
-    showToast(`Tee time listed. Auction opens at ${opensReadable}`);
+
+    setSaving(false);
+
+    if (auctionError) {
+      setFormError(auctionError.message);
+      showToast("Slot saved but the auction failed to open", "error");
+      return;
+    }
+
+    showToast(`Auction is live — closes in ${days} day${days > 1 ? "s" : ""}`);
     setTimeout(() => navigate("/admin/auctions"), 800);
   }
 
@@ -75,14 +112,14 @@ export default function AdminNewSlotPage() {
     <div>
       <h2 className="serif" style={{ marginBottom: 6 }}>List a Tee Time</h2>
       <div className="subtitle-mono" style={{ marginTop: 0, marginBottom: 28 }}>
-        This will open an auction
+        {courseName ? `${courseName} · ` : ""}This will open a live auction
       </div>
 
       <form className="form" onSubmit={submit}>
         <div className="form-card">
           <div className="field">
             <label className="field-label">Date</label>
-            <input type="date" value={date} onChange={(e) => onDateChange(e.target.value)} />
+            <input type="date" value={date} min={todayISO()} onChange={(e) => setDate(e.target.value)} />
             {errors.date && <div className="field-error">{errors.date}</div>}
           </div>
 
@@ -109,42 +146,33 @@ export default function AdminNewSlotPage() {
           </div>
 
           <div className="field">
-            <label className="field-label">Rack Rate ($)</label>
+            <label className="field-label">Rack Rate ($) · auction floor</label>
             <input type="number" value={rack} min={1}
               onChange={(e) => setRack(Number(e.target.value))} />
             {errors.rack && <div className="field-error">{errors.rack}</div>}
           </div>
 
           <div className="field">
-            <label className="field-label">Bid Increment ($) · optional</label>
-            <input type="number" value={increment} min={1}
-              onChange={(e) => setIncrement(Number(e.target.value))} />
+            <label className="field-label">Auction Length</label>
+            <div className="radio-group">
+              {LENGTHS.map((l) => (
+                <button
+                  key={l.key}
+                  type="button"
+                  className={`radio-pill ${length === l.key ? "selected" : ""}`}
+                  onClick={() => setLength(l.key)}
+                >
+                  {l.label}
+                </button>
+              ))}
+            </div>
           </div>
 
-          <div className="field">
-            <label className="field-label">Auction Opens At</label>
-            <input type="datetime-local" value={opensAt}
-              onChange={(e) => setOpensAt(e.target.value)} />
-            {errors.opensAt && <div className="field-error">{errors.opensAt}</div>}
-          </div>
+          {formError && <div className="field-error" style={{ marginBottom: 12 }}>{formError}</div>}
 
-          <div className="field">
-            <label className="field-label">Auction Ends At</label>
-            <input type="datetime-local" value={endsAt}
-              onChange={(e) => setEndsAt(e.target.value)} />
-            {errors.endsAt && <div className="field-error">{errors.endsAt}</div>}
-          </div>
-
-          <div className="field">
-            <label className="field-label">Notes · optional</label>
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Cart included, range balls, etc."
-            />
-          </div>
-
-          <button type="submit" className="btn-primary">List & Open Auction</button>
+          <button type="submit" className="btn-primary" disabled={saving}>
+            {saving ? "Opening auction…" : "List & Open Auction"}
+          </button>
         </div>
 
         <div className="helper-card">
@@ -156,6 +184,10 @@ export default function AdminNewSlotPage() {
           <div className="h-row">
             <span className="dim">At +30% premium</span>
             <span className="num gold">${payoutAtPremium}</span>
+          </div>
+          <div className="h-row">
+            <span className="dim">Buyer premium</span>
+            <span className="num">14%</span>
           </div>
         </div>
       </form>
