@@ -35,7 +35,7 @@ export function RequireAdminAuth({ children }: { children: ReactNode }) {
 }
 
 export function AdminLayout() {
-  const { courseName, logout } = useCourseAdmin();
+  const { courseName, courses, selectedCourseId, setSelectedCourse, logout } = useCourseAdmin();
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -56,8 +56,24 @@ export function AdminLayout() {
             </button>
             <div className="wordmark">TeeStrike</div>
           </div>
-          <div className="course-tag">
-            {courseName} · Course Dashboard
+          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+            {courses.length > 1 ? (
+              <select
+                className="course-picker"
+                aria-label="Select course"
+                value={selectedCourseId ?? ""}
+                onChange={(e) => setSelectedCourse(e.target.value)}
+              >
+                {courses.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <div className="course-tag">{courseName}</div>
+            )}
+            <div className="course-tag">Course Dashboard</div>
           </div>
         </header>
 
