@@ -1744,6 +1744,11 @@ function TeeStrikeApp({ initialAuctions }: { initialAuctions: Auction[] }) {
 
       {showAuth && <AuthModal onClose={() => setShowAuth(false)} />}
 
+      {secondChance && user && (
+        <SecondChanceModal offer={secondChance} userId={user.id} onClose={closeSecondChance} />
+      )}
+
+
       {bidAuction && (
         <BidModal
           auction={bidAuction}
