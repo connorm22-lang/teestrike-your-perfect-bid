@@ -1,29 +1,124 @@
+import { useEffect, useState } from "react";
 import { useCourseAdmin } from "../CourseAdminContext";
+import { supabase } from "@/integrations/supabase/client";
 
-const STATS = [
-  { label: "Live Auctions", value: "3", sub: "Bidding now", tone: "" as const },
-  { label: "Auctions This Week", value: "8", sub: "Listed", tone: "" as const },
-  { label: "Revenue This Month", value: "$2,340", sub: "Gross · paid to course", tone: "gold" as const },
-  { label: "Avg Premium", value: "+47%", sub: "Above rack rate", tone: "green" as const },
-];
+type Summary = {
+  liveAuctions: number;
+  totalBids: number;
+  highestBid: number | null;
+  activeValue: number;
+  salesCount: number;
+  salesRevenue: number;
+};
 
-const ACTIVITY = [
-  { time: "2 min ago", text: <>New bid · <strong>$95</strong> on Saturday 8:30 AM · 4 bidders</>, dot: "" },
-  { time: "14 min ago", text: <>Auction closed · Sat 9:00 AM · <strong>$124</strong> (premium $17)</>, dot: "green" },
-  { time: "1 hr ago", text: <>New bid · <strong>$84</strong> on Saturday 8:30 AM · 3 bidders</>, dot: "" },
-  { time: "3 hr ago", text: <>Slot listed · Sunday 7:30 AM foursome</>, dot: "dim" },
-  { time: "Yesterday", text: <>Payout sent · <strong>$112</strong> to connected account</>, dot: "green" },
-];
+const EMPTY: Summary = {
+  liveAuctions: 0,
+  totalBids: 0,
+  highestBid: null,
+  activeValue: 0,
+  salesCount: 0,
+  salesRevenue: 0,
+};
+
+function money(n: number) {
+  return `$${Math.round(n).toLocaleString()}`;
+}
 
 export default function AdminDashboardPage() {
-  const { courseName } = useCourseAdmin();
+  const { courseName, courseId } = useCourseAdmin();
+  const [summary, setSummary] = useState<Summary>(EMPTY);
+  const [recent, setRecent] = useState<
+    { id: string; label: string; amount: number | null; when: string; tone: string }[]
+  >([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!courseId) return;
+    let active = true;
+
+    (async () => {
+      setLoading(true);
+      const [{ data: auctions }, { data: txs }] = await Promise.all([
+        supabase
+          .from("auctions")
+          .select("id, tee_date, tee_time, current_bid, floor_price, bid_count, status, updated_at")
+          .eq("course_id", courseId),
+        supabase
+          .from("transactions")
+          .select("id, winning_bid, total_charged, status, created_at")
+          .eq("course_id", courseId)
+          .order("created_at", { ascending: false }),
+      ]);
+
+      if (!active) return;
+
+      const live = (auctions ?? []).filter((a) => a.status === "live" || a.status === "closing");
+      const bids = live.reduce((s, a) => s + (a.bid_count ?? 0), 0);
+      const highest = live.reduce<number | null>((m, a) => {
+        const v = a.current_bid == null ? null : Number(a.current_bid);
+        if (v == null) return m;
+        return m == null || v > m ? v : m;
+      }, null);
+      const activeValue = live.reduce(
+        (s, a) => s + Number(a.current_bid ?? a.floor_price ?? 0),
+        0
+      );
+
+      setSummary({
+        liveAuctions: live.length,
+        totalBids: bids,
+        highestBid: highest,
+        activeValue,
+        salesCount: (txs ?? []).length,
+        salesRevenue: (txs ?? []).reduce((s, t) => s + Number(t.winning_bid ?? 0), 0),
+      });
+
+      setRecent(
+        (txs ?? []).slice(0, 6).map((t) => ({
+          id: t.id,
+          label: `Sale closed · ${t.status}`,
+          amount: Number(t.winning_bid ?? 0),
+          when: new Date(t.created_at).toLocaleString("en-US", {
+            month: "short",
+            day: "numeric",
+            hour: "numeric",
+            minute: "2-digit",
+          }),
+          tone: t.status === "paid_out" || t.status === "captured" ? "green" : "",
+        }))
+      );
+      setLoading(false);
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [courseId]);
+
   const today = new Date().toLocaleDateString("en-US", {
     weekday: "long",
     year: "numeric",
     month: "long",
     day: "numeric",
   });
-  const courseFirstWord = courseName.split(" ")[0];
+  const courseFirstWord = (courseName || "Course").split(" ")[0];
+
+  const STATS = [
+    { label: "Live Auctions", value: String(summary.liveAuctions), sub: "Bidding now", tone: "" },
+    { label: "Total Bids", value: String(summary.totalBids), sub: "Across live auctions", tone: "" },
+    {
+      label: "Highest Active Bid",
+      value: summary.highestBid == null ? "—" : money(summary.highestBid),
+      sub: `${money(summary.activeValue)} on the floor`,
+      tone: "gold",
+    },
+    {
+      label: "Completed Sales",
+      value: String(summary.salesCount),
+      sub: `${money(summary.salesRevenue)} in clearing price`,
+      tone: "green",
+    },
+  ];
 
   return (
     <div>
@@ -36,7 +131,7 @@ export default function AdminDashboardPage() {
         {STATS.map((s) => (
           <div className="stat-card" key={s.label}>
             <div className="stat-label">{s.label}</div>
-            <div className={`stat-value ${s.tone}`}>{s.value}</div>
+            <div className={`stat-value ${s.tone}`}>{loading ? "—" : s.value}</div>
             <div className="stat-sub">{s.sub}</div>
           </div>
         ))}
@@ -44,13 +139,21 @@ export default function AdminDashboardPage() {
 
       <div className="section-label">Recent Activity</div>
       <div className="activity">
-        {ACTIVITY.map((a, i) => (
-          <div className="activity-row" key={i}>
-            <div className="activity-time">{a.time}</div>
-            <div className={`activity-dot ${a.dot}`} />
-            <div className="activity-text">{a.text}</div>
+        {recent.length === 0 ? (
+          <div className="dim mono" style={{ fontSize: 11, letterSpacing: "0.18em" }}>
+            {loading ? "Loading…" : "No completed sales yet"}
           </div>
-        ))}
+        ) : (
+          recent.map((a) => (
+            <div className="activity-row" key={a.id}>
+              <div className="activity-time">{a.when}</div>
+              <div className={`activity-dot ${a.tone}`} />
+              <div className="activity-text">
+                {a.label} · <strong>{money(a.amount ?? 0)}</strong>
+              </div>
+            </div>
+          ))
+        )}
       </div>
     </div>
   );
