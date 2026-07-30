@@ -1,4 +1,4 @@
-import { useState, FormEvent } from "react";
+import { useState, useEffect, FormEvent } from "react";
 import { useCourseAdmin } from "../CourseAdminContext";
 import { useAdminToast } from "../useToast";
 
@@ -12,10 +12,17 @@ export default function AdminSettingsPage() {
   const [rack, setRack] = useState(rackRateDefault);
   const [email, setEmail] = useState(contactEmail);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => { setName(courseName); }, [courseName]);
+  useEffect(() => { setS(slug); }, [slug]);
+  useEffect(() => { setLoc(courseLocation); }, [courseLocation]);
+  useEffect(() => { setRack(rackRateDefault); }, [rackRateDefault]);
+  useEffect(() => { setEmail(contactEmail); }, [contactEmail]);
 
   const [showStripeModal, setShowStripeModal] = useState(false);
 
-  function save(e: FormEvent) {
+  async function save(e: FormEvent) {
     e.preventDefault();
     const next: Record<string, string> = {};
     if (!name) next.name = "Course name is required";
@@ -24,10 +31,16 @@ export default function AdminSettingsPage() {
     if (!rack || rack <= 0) next.rack = "Rack rate must be positive";
     setErrors(next);
     if (Object.keys(next).length > 0) return;
-    updateProfile({
+    setSaving(true);
+    const res = await updateProfile({
       courseName: name, slug: s, courseLocation: loc,
       rackRateDefault: rack, contactEmail: email,
     });
+    setSaving(false);
+    if (!res.ok) {
+      showToast(res.error || "Couldn't save changes", "error");
+      return;
+    }
     showToast("Course profile saved");
   }
 
@@ -65,7 +78,7 @@ export default function AdminSettingsPage() {
             <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
             {errors.email && <div className="field-error">{errors.email}</div>}
           </div>
-          <button type="submit" className="btn-primary">Save Changes</button>
+          <button type="submit" className="btn-primary" disabled={saving}>{saving ? "Saving…" : "Save Changes"}</button>
         </form>
       </div>
 
