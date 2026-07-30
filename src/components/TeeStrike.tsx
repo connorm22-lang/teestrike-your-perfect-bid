@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useSecondChanceOffer, SecondChanceModal, CreditBalance } from "./rewards";
 
 /* ─────────────────────────────────────────────────────────────
    DESIGN SYSTEM  
@@ -1357,7 +1358,10 @@ function ProfilePage({ auctions, events, userBids, user }: {
 
       </div>
 
+      <CreditBalance userId={user.id} />
+
       {/* Stats grid */}
+
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px,1fr))", gap: 14, marginBottom: 28 }}>
         {[
           ["ACTIVE BIDS", userAuctions.length, "var(--white)"],
@@ -1639,6 +1643,8 @@ export default function TeeStrike() {
 
 function TeeStrikeApp({ initialAuctions }: { initialAuctions: Auction[] }) {
   const { user } = useAuthSession();
+  const { offer: secondChance, close: closeSecondChance } = useSecondChanceOffer(user?.id ?? null);
+
   const { auctions, events, outbidAlert, placeBid, userBidsRef } = useLiveAuctions(initialAuctions, user?.id ?? null);
 
   const [bidTarget, setBidTarget] = useState<Auction | null>(null);
@@ -1737,6 +1743,11 @@ function TeeStrikeApp({ initialAuctions }: { initialAuctions: Auction[] }) {
       `}</style>
 
       {showAuth && <AuthModal onClose={() => setShowAuth(false)} />}
+
+      {secondChance && user && (
+        <SecondChanceModal offer={secondChance} userId={user.id} onClose={closeSecondChance} />
+      )}
+
 
       {bidAuction && (
         <BidModal
