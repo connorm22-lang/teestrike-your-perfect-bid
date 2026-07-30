@@ -16,8 +16,18 @@ export function AdminStyles() {
 }
 
 export function RequireAdminAuth({ children }: { children: ReactNode }) {
-  const { isAuthenticated } = useCourseAdmin();
+  const { isAuthenticated, loading } = useCourseAdmin();
   const location = useLocation();
+  if (loading) {
+    return (
+      <div className="ts-admin">
+        <AdminStyles />
+        <div className="login-shell">
+          <div className="subtitle-mono">Loading course…</div>
+        </div>
+      </div>
+    );
+  }
   if (!isAuthenticated) {
     return <Navigate to="/admin/login" replace state={{ from: location.pathname }} />;
   }
