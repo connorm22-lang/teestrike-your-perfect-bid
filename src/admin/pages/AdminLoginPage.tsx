@@ -4,27 +4,28 @@ import { useCourseAdmin } from "../CourseAdminContext";
 import { AdminStyles } from "../AdminLayout";
 import { useAdminToast } from "../useToast";
 
-const DEMO_EMAIL = "admin@waterchase.com";
-const DEMO_PASSWORD = "password123";
-
 export default function AdminLoginPage() {
   const { login } = useCourseAdmin();
   const navigate = useNavigate();
   const location = useLocation();
   const { showToast, toastNode } = useAdminToast();
-  const [email, setEmail] = useState(DEMO_EMAIL);
-  const [password, setPassword] = useState(DEMO_PASSWORD);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
 
-  function submit(e: FormEvent) {
+  async function submit(e: FormEvent) {
     e.preventDefault();
     if (!email || !password) {
       setErr("Email and password are required");
       return;
     }
-    const ok = login(email, password);
-    if (!ok) {
-      setErr("Invalid credentials");
+    setErr("");
+    setBusy(true);
+    const res = await login(email, password);
+    setBusy(false);
+    if (!res.ok) {
+      setErr(res.error || "Those credentials don't match a course account.");
       showToast("Login failed", "error");
       return;
     }
@@ -63,18 +64,8 @@ export default function AdminLoginPage() {
 
           {err && <div className="field-error" style={{ marginBottom: 16 }}>{err}</div>}
 
-          <button type="submit" className="btn-primary">Sign In</button>
-
-          <button
-            type="button"
-            className="login-fill"
-            onClick={() => {
-              setEmail(DEMO_EMAIL);
-              setPassword(DEMO_PASSWORD);
-              setErr("");
-            }}
-          >
-            [ Fill demo credentials ]
+          <button type="submit" className="btn-primary" disabled={busy}>
+            {busy ? "Signing in…" : "Sign In"}
           </button>
         </form>
         {toastNode}
