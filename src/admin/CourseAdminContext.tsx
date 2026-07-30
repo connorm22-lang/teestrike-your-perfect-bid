@@ -117,7 +117,13 @@ export function CourseAdminProvider({ children }: { children: ReactNode }) {
   const updateProfile = useCallback<AdminState["updateProfile"]>(
     async (patch) => {
       if (!course) return { ok: false, error: "No course loaded" };
-      const payload: Record<string, unknown> = {};
+      const payload: {
+        name?: string;
+        location?: string;
+        rack_rate_default?: number;
+        contact_email?: string;
+        slug?: string;
+      } = {};
       if (patch.courseName !== undefined) payload.name = patch.courseName;
       if (patch.courseLocation !== undefined) payload.location = patch.courseLocation;
       if (patch.rackRateDefault !== undefined) payload.rack_rate_default = patch.rackRateDefault;
