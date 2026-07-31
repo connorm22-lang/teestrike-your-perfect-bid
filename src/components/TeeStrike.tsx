@@ -1753,7 +1753,18 @@ function TeeStrikeApp({ initialAuctions }: { initialAuctions: Auction[] }) {
 
         {tab === "MARKET" && <MarketplacePage auctions={auctions} events={events} onBid={requestBid} />}
         {tab === "SEARCH" && <SearchPage auctions={auctions} onBid={requestBid} />}
-        {tab === "PROFILE" && <ProfilePage auctions={auctions} events={events} userBids={userBidsRef.current} user={user} />}
+        {tab === "PROFILE" && (
+          <ProfilePage
+            auctions={auctions}
+            events={events}
+            userBids={userBidsRef.current}
+            user={user}
+            card={card}
+            cardLoading={cardLoading}
+            onAddCard={() => setShowAddCard(true)}
+          />
+        )}
+
       </div>
 
       <style>{`
