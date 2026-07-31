@@ -263,6 +263,8 @@ export type Database = {
       }
       profiles: {
         Row: {
+          card_brand: string | null
+          card_last4: string | null
           created_at: string
           email: string
           full_name: string | null
@@ -270,9 +272,12 @@ export type Database = {
           phone: string | null
           role: Database["public"]["Enums"]["user_role"]
           stripe_customer_id: string | null
+          stripe_payment_method_id: string | null
           updated_at: string
         }
         Insert: {
+          card_brand?: string | null
+          card_last4?: string | null
           created_at?: string
           email: string
           full_name?: string | null
@@ -280,9 +285,12 @@ export type Database = {
           phone?: string | null
           role?: Database["public"]["Enums"]["user_role"]
           stripe_customer_id?: string | null
+          stripe_payment_method_id?: string | null
           updated_at?: string
         }
         Update: {
+          card_brand?: string | null
+          card_last4?: string | null
           created_at?: string
           email?: string
           full_name?: string | null
@@ -290,6 +298,7 @@ export type Database = {
           phone?: string | null
           role?: Database["public"]["Enums"]["user_role"]
           stripe_customer_id?: string | null
+          stripe_payment_method_id?: string | null
           updated_at?: string
         }
         Relationships: []
