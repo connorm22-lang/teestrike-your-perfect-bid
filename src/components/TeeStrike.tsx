@@ -1659,6 +1659,9 @@ function TeeStrikeApp({ initialAuctions }: { initialAuctions: Auction[] }) {
   const [dismissOutbid, setDismissOutbid] = useState(false);
   const [tab, setTab] = useState<Tab>("MARKET");
   const [showAuth, setShowAuth] = useState(false);
+  const [showAddCard, setShowAddCard] = useState(false);
+
+  const { card, loading: cardLoading, refresh: refreshCard } = useCardOnFile(user?.id ?? null);
 
   const requestBid = (a: Auction) => {
     if (!user) { setShowAuth(true); return; }
@@ -1667,8 +1670,17 @@ function TeeStrikeApp({ initialAuctions }: { initialAuctions: Auction[] }) {
 
   const handleConfirm = async (id: string, amt: number): Promise<BidResult> => {
     if (!user) { setBidTarget(null); setShowAuth(true); return { ok: false, message: "Sign in to place a bid" }; }
+
+    let onFile = card;
+    if (!onFile?.last4) onFile = await refreshCard();
+    if (!onFile?.last4) {
+      setShowAddCard(true);
+      return { ok: false, message: "Add a card to place this bid" };
+    }
+
     return placeBid(id, amt);
   };
+
 
   const bidAuction = bidTarget ? auctions.find(a => a.id === bidTarget.id) : null;
   const showOutbid = outbidAlert && !dismissOutbid;
