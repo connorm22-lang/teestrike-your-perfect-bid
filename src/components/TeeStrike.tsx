@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useSecondChanceOffer, SecondChanceModal, CreditBalance } from "./rewards";
+import { useCardOnFile, AddCardModal, PaymentMethodCard, type CardOnFile } from "./payments";
 
 /* ─────────────────────────────────────────────────────────────
    DESIGN SYSTEM  
@@ -1289,13 +1290,17 @@ function SearchPage({ auctions, onBid }: { auctions: Auction[]; onBid: (a: Aucti
 
 /* ── PROFILE PAGE ──────────────────────────────────────── */
 
-function ProfilePage({ auctions, events, userBids, user }: {
+function ProfilePage({ auctions, events, userBids, user, card, cardLoading, onAddCard }: {
   auctions: Auction[];
   events: BidEvent[];
   userBids: Record<string, number>;
   user: any;
+  card: CardOnFile | null;
+  cardLoading: boolean;
+  onAddCard: () => void;
 }) {
   const userAuctions = auctions.filter(a => userBids[a.id] !== undefined);
+
   const leading = userAuctions.filter(a => a._userLeading).length;
   const outbid = userAuctions.length - leading;
   const totalCommitted = userAuctions.reduce((s, a) => s + (userBids[a.id] || 0) * a.players, 0);
@@ -1358,7 +1363,10 @@ function ProfilePage({ auctions, events, userBids, user }: {
 
       </div>
 
+      <PaymentMethodCard card={card} loading={cardLoading} onAdd={onAddCard} />
+
       <CreditBalance userId={user.id} />
+
 
       {/* Stats grid */}
 
@@ -1651,6 +1659,9 @@ function TeeStrikeApp({ initialAuctions }: { initialAuctions: Auction[] }) {
   const [dismissOutbid, setDismissOutbid] = useState(false);
   const [tab, setTab] = useState<Tab>("MARKET");
   const [showAuth, setShowAuth] = useState(false);
+  const [showAddCard, setShowAddCard] = useState(false);
+
+  const { card, loading: cardLoading, refresh: refreshCard } = useCardOnFile(user?.id ?? null);
 
   const requestBid = (a: Auction) => {
     if (!user) { setShowAuth(true); return; }
@@ -1659,8 +1670,17 @@ function TeeStrikeApp({ initialAuctions }: { initialAuctions: Auction[] }) {
 
   const handleConfirm = async (id: string, amt: number): Promise<BidResult> => {
     if (!user) { setBidTarget(null); setShowAuth(true); return { ok: false, message: "Sign in to place a bid" }; }
+
+    let onFile = card;
+    if (!onFile?.last4) onFile = await refreshCard();
+    if (!onFile?.last4) {
+      setShowAddCard(true);
+      return { ok: false, message: "Add a card to place this bid" };
+    }
+
     return placeBid(id, amt);
   };
+
 
   const bidAuction = bidTarget ? auctions.find(a => a.id === bidTarget.id) : null;
   const showOutbid = outbidAlert && !dismissOutbid;
@@ -1733,7 +1753,18 @@ function TeeStrikeApp({ initialAuctions }: { initialAuctions: Auction[] }) {
 
         {tab === "MARKET" && <MarketplacePage auctions={auctions} events={events} onBid={requestBid} />}
         {tab === "SEARCH" && <SearchPage auctions={auctions} onBid={requestBid} />}
-        {tab === "PROFILE" && <ProfilePage auctions={auctions} events={events} userBids={userBidsRef.current} user={user} />}
+        {tab === "PROFILE" && (
+          <ProfilePage
+            auctions={auctions}
+            events={events}
+            userBids={userBidsRef.current}
+            user={user}
+            card={card}
+            cardLoading={cardLoading}
+            onAddCard={() => setShowAddCard(true)}
+          />
+        )}
+
       </div>
 
       <style>{`
@@ -1743,6 +1774,16 @@ function TeeStrikeApp({ initialAuctions }: { initialAuctions: Auction[] }) {
       `}</style>
 
       {showAuth && <AuthModal onClose={() => setShowAuth(false)} />}
+
+      {showAddCard && user && (
+        <AddCardModal
+          title={card?.last4 ? "Replace your card" : "Add a card to bid"}
+          note={card?.last4 ? undefined : "We save your card now and only charge it if you win a tee time."}
+          onClose={() => setShowAddCard(false)}
+          onSaved={async () => { await refreshCard(); setShowAddCard(false); }}
+        />
+      )}
+
 
       {secondChance && user && (
         <SecondChanceModal offer={secondChance} userId={user.id} onClose={closeSecondChance} />
