@@ -1775,6 +1775,16 @@ function TeeStrikeApp({ initialAuctions }: { initialAuctions: Auction[] }) {
 
       {showAuth && <AuthModal onClose={() => setShowAuth(false)} />}
 
+      {showAddCard && user && (
+        <AddCardModal
+          title={card?.last4 ? "Replace your card" : "Add a card to bid"}
+          note={card?.last4 ? undefined : "We save your card now and only charge it if you win a tee time."}
+          onClose={() => setShowAddCard(false)}
+          onSaved={async () => { await refreshCard(); setShowAddCard(false); }}
+        />
+      )}
+
+
       {secondChance && user && (
         <SecondChanceModal offer={secondChance} userId={user.id} onClose={closeSecondChance} />
       )}
