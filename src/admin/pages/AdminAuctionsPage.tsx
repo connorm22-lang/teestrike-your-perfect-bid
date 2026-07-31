@@ -178,7 +178,7 @@ export default function AdminAuctionsPage() {
                   <td style={{ textAlign: "right" }}>
                     {canCancel ? (
                       <button
-                        className="btn ghost"
+                        className="btn-secondary btn-danger"
                         disabled={cancelling === a.id}
                         onClick={() => cancelAuction(a.id)}
                         style={{ fontSize: 10, letterSpacing: "0.16em", padding: "6px 12px" }}
