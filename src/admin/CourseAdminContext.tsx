@@ -60,11 +60,7 @@ export function CourseAdminProvider({ children }: { children: ReactNode }) {
       return [];
     }
 
-    const { data } = await supabase
-      .from("courses")
-      .select("id, name, slug, location, rack_rate_default, contact_email")
-      .eq("admin_id", userId)
-      .order("name");
+    const { data } = await (supabase as any).rpc("get_my_courses");
 
     const rows = (data as CourseRow[] | null) ?? [];
     setCourses(rows);
