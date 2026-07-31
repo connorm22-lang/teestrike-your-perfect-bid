@@ -59,16 +59,11 @@ export default function AdminDashboardPage() {
         if (v == null) return m;
         return m == null || v > m ? v : m;
       }, null);
-      const activeValue = live.reduce(
-        (s, a) => s + Number(a.current_bid ?? a.floor_price ?? 0),
-        0
-      );
-
       setSummary({
         liveAuctions: live.length,
         totalBids: bids,
         highestBid: highest,
-        activeValue,
+        activeValue: 0,
         salesCount: (txs ?? []).length,
         salesRevenue: (txs ?? []).reduce((s, t) => s + Number(t.winning_bid ?? 0), 0),
       });
@@ -109,7 +104,7 @@ export default function AdminDashboardPage() {
     {
       label: "Highest Active Bid",
       value: summary.highestBid == null ? "—" : money(summary.highestBid),
-      sub: `${money(summary.activeValue)} on the floor`,
+      sub: summary.highestBid == null ? "No active bids yet" : "Top bid across your live auctions.",
       tone: "gold",
     },
     {
