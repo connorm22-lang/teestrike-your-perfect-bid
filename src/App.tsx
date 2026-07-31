@@ -25,6 +25,9 @@ const App = () => (
         <CourseAdminProvider>
           <Routes>
             <Route path="/" element={<Index />} />
+            <Route path="/.lovable/oauth/consent" element={<OAuthConsent />} />
+
+
 
             {/* Admin (course operator) routes */}
             <Route path="/admin/login" element={<AdminLoginPage />} />
