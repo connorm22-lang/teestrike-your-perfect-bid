@@ -147,17 +147,19 @@ export default function AdminAuctionsPage() {
               <th>Bids</th>
               <th>Time Left</th>
               <th>Status</th>
+              <th />
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={7} className="dim mono" style={{ fontSize: 11, letterSpacing: "0.18em" }}>
+                <td colSpan={8} className="dim mono" style={{ fontSize: 11, letterSpacing: "0.18em" }}>
                   {loading ? "Loading auctions…" : "No auctions yet"}
                 </td>
               </tr>
             ) : filtered.map((a) => {
               const r = formatRemaining(a.endsAt, now);
+              const canCancel = a.bids === 0 && (a.status === "LIVE" || a.status === "SCHEDULED" || a.status === "CLOSING");
               return (
                 <tr key={a.id}>
                   <td>{a.tee}</td>
@@ -173,9 +175,22 @@ export default function AdminAuctionsPage() {
                       <span className="dot" />{a.status}
                     </span>
                   </td>
+                  <td style={{ textAlign: "right" }}>
+                    {canCancel ? (
+                      <button
+                        className="btn ghost"
+                        disabled={cancelling === a.id}
+                        onClick={() => cancelAuction(a.id)}
+                        style={{ fontSize: 10, letterSpacing: "0.16em", padding: "6px 12px" }}
+                      >
+                        {cancelling === a.id ? "CANCELLING…" : "CANCEL"}
+                      </button>
+                    ) : null}
+                  </td>
                 </tr>
               );
             })}
+
           </tbody>
         </table>
       </div>
