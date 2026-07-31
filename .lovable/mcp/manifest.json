@@ -3,11 +3,15 @@
   "sdk_version": "0.25.0",
   "path": "/functions/v1/mcp",
   "auth": {
-    "type": "none"
+    "type": "oauth",
+    "issuer": "https://jikemqgqkldqrxjeddxg.supabase.co/auth/v1",
+    "accepted_audiences": [
+      "authenticated"
+    ]
   },
   "mcp": {
     "server": {
-      "name": "teestrike-mcp",
+      "name": "teestrike",
       "version": "0.1.0",
       "title": "TeeStrike"
     },
