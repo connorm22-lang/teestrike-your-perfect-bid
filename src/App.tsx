@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import Index from "./pages/Index.tsx";
 import NotFound from "./pages/NotFound.tsx";
+import OAuthConsent from "./pages/OAuthConsent.tsx";
 import { CourseAdminProvider } from "./admin/CourseAdminContext";
 import { AdminLayout, RequireAdminAuth } from "./admin/AdminLayout";
 import AdminLoginPage from "./admin/pages/AdminLoginPage";
@@ -25,6 +26,9 @@ const App = () => (
         <CourseAdminProvider>
           <Routes>
             <Route path="/" element={<Index />} />
+            <Route path="/.lovable/oauth/consent" element={<OAuthConsent />} />
+
+
 
             {/* Admin (course operator) routes */}
             <Route path="/admin/login" element={<AdminLoginPage />} />

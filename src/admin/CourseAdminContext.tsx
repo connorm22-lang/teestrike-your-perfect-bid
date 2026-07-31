@@ -60,11 +60,7 @@ export function CourseAdminProvider({ children }: { children: ReactNode }) {
       return [];
     }
 
-    const { data } = await supabase
-      .from("courses")
-      .select("id, name, slug, location, rack_rate_default, contact_email")
-      .eq("admin_id", userId)
-      .order("name");
+    const { data } = await (supabase as any).rpc("get_my_courses");
 
     const rows = (data as CourseRow[] | null) ?? [];
     setCourses(rows);
@@ -160,18 +156,15 @@ export function CourseAdminProvider({ children }: { children: ReactNode }) {
       if (patch.contactEmail !== undefined) payload.contact_email = patch.contactEmail;
       if (patch.slug !== undefined) payload.slug = patch.slug;
 
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from("courses")
         .update(payload)
-        .eq("id", course.id)
-        .select("id, name, slug, location, rack_rate_default, contact_email")
-        .maybeSingle();
+        .eq("id", course.id);
 
       if (error) return { ok: false, error: error.message };
-      if (data) {
-        const row = data as CourseRow;
-        setCourses((prev) => prev.map((c) => (c.id === row.id ? row : c)));
-      }
+
+      const { data } = await (supabase as any).rpc("get_my_courses");
+      if (data) setCourses(data as CourseRow[]);
       return { ok: true };
     },
     [course]

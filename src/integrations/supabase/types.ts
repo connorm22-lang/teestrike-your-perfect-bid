@@ -491,6 +491,19 @@ export type Database = {
         Args: { p_offer_id: string; p_user_id: string }
         Returns: Json
       }
+      get_my_courses: {
+        Args: never
+        Returns: {
+          contact_email: string
+          id: string
+          location: string
+          name: string
+          rack_rate_default: number
+          slug: string
+          stripe_account_id: string
+          stripe_onboarded: boolean
+        }[]
+      }
       offer_next_loser: {
         Args: { p_offered: string; p_rank: number; p_source: string }
         Returns: undefined

@@ -3,7 +3,7 @@
 // supabase function: mcp
 // Bundled from src/lib/mcp/index.ts by @lovable.dev/mcp-js.
 // src/lib/mcp/index.ts
-import { defineMcp } from "npm:@lovable.dev/mcp-js@0.25.0";
+import { auth, defineMcp } from "npm:@lovable.dev/mcp-js@0.25.0";
 
 // src/lib/mcp/tools/list-courses.ts
 import { defineTool } from "npm:@lovable.dev/mcp-js@0.25.0";
@@ -284,11 +284,16 @@ var estimate_bid_default = defineTool4({
 });
 
 // src/lib/mcp/index.ts
+var projectRef = "jikemqgqkldqrxjeddxg";
 var mcp_default = defineMcp({
-  name: "teestrike-mcp",
+  name: "teestrike",
   title: "TeeStrike",
   version: "0.1.0",
-  instructions: "Tools for TeeStrike, a premium golf tee time auction marketplace in the Dallas\u2013Fort Worth area. Use `list_courses` to browse courses, `get_course` for a full course profile, `list_tee_times` to find live tee time auctions (filterable by course, group size, closing window, and max bid), and `estimate_bid_cost` to price a bid including the 14% buyer's premium. All data is the public marketplace catalog.",
+  instructions: "Tools for TeeStrike, a premium golf tee time auction marketplace in the Dallas\u2013Fort Worth area. Use `list_courses` to browse courses, `get_course` for a full course profile, `list_tee_times` to find live tee time auctions (filterable by course, group size, closing window, and max bid), and `estimate_bid_cost` to price a bid including the 14% buyer's premium.",
+  auth: auth.oauth.issuer({
+    issuer: `https://${projectRef}.supabase.co/auth/v1`,
+    acceptedAudiences: "authenticated"
+  }),
   tools: [list_courses_default, get_course_default, list_tee_times_default, estimate_bid_default]
 });
 
