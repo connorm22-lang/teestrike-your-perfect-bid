@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useCourseAdmin } from "../CourseAdminContext";
 
@@ -45,41 +45,58 @@ export default function AdminAuctionsPage() {
   const [filter, setFilter] = useState<FilterKey>("all");
   const [rows, setRows] = useState<Auction[]>([]);
   const [loading, setLoading] = useState(true);
+  const [cancelling, setCancelling] = useState<string | null>(null);
 
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(t);
   }, []);
 
-  useEffect(() => {
+  const load = useCallback(async () => {
     if (!courseId) return;
-    let active = true;
-    (async () => {
-      setLoading(true);
-      const { data } = await supabase
-        .from("auctions")
-        .select("id, tee_date, tee_time, players, rack_rate, floor_price, current_bid, bid_count, status, ends_at")
-        .eq("course_id", courseId)
-        .order("tee_date", { ascending: true })
-        .order("tee_time", { ascending: true });
-      if (!active) return;
-      setRows(
-        (data ?? []).map((a) => ({
-          id: a.id,
-          tee: formatTee(a.tee_date, a.tee_time),
-          sortKey: `${a.tee_date}T${a.tee_time}`,
-          players: a.players,
-          rack: Number(a.rack_rate ?? 0),
-          current: a.current_bid == null ? null : Number(a.current_bid),
-          bids: a.bid_count ?? 0,
-          endsAt: a.ends_at ? new Date(a.ends_at).getTime() : 0,
-          status: String(a.status).toUpperCase(),
-        }))
-      );
-      setLoading(false);
-    })();
-    return () => { active = false; };
+    setLoading(true);
+    const { data } = await supabase
+      .from("auctions")
+      .select("id, tee_date, tee_time, players, rack_rate, floor_price, current_bid, bid_count, status, ends_at")
+      .eq("course_id", courseId)
+      .order("tee_date", { ascending: true })
+      .order("tee_time", { ascending: true });
+    setRows(
+      (data ?? []).map((a) => ({
+        id: a.id,
+        tee: formatTee(a.tee_date, a.tee_time),
+        sortKey: `${a.tee_date}T${a.tee_time}`,
+        players: a.players,
+        rack: Number(a.rack_rate ?? 0),
+        current: a.current_bid == null ? null : Number(a.current_bid),
+        bids: a.bid_count ?? 0,
+        endsAt: a.ends_at ? new Date(a.ends_at).getTime() : 0,
+        status: String(a.status).toUpperCase(),
+      }))
+    );
+    setLoading(false);
   }, [courseId]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const cancelAuction = useCallback(async (id: string) => {
+    if (!window.confirm("Cancel this tee time auction? It will be removed from the marketplace.")) return;
+    setCancelling(id);
+    const { error } = await supabase
+      .from("auctions")
+      .update({ status: "cancelled" })
+      .eq("id", id)
+      .eq("bid_count", 0);
+    setCancelling(null);
+    if (error) {
+      window.alert("Couldn't cancel that auction. Please try again.");
+      return;
+    }
+    await load();
+  }, [load]);
+
 
   const counts = useMemo(() => ({
     all: rows.length,
