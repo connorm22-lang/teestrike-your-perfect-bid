@@ -1363,7 +1363,10 @@ function ProfilePage({ auctions, events, userBids, user, card, cardLoading, onAd
 
       </div>
 
+      <PaymentMethodCard card={card} loading={cardLoading} onAdd={onAddCard} />
+
       <CreditBalance userId={user.id} />
+
 
       {/* Stats grid */}
 
