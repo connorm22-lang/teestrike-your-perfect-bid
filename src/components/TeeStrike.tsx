@@ -1290,13 +1290,17 @@ function SearchPage({ auctions, onBid }: { auctions: Auction[]; onBid: (a: Aucti
 
 /* ── PROFILE PAGE ──────────────────────────────────────── */
 
-function ProfilePage({ auctions, events, userBids, user }: {
+function ProfilePage({ auctions, events, userBids, user, card, cardLoading, onAddCard }: {
   auctions: Auction[];
   events: BidEvent[];
   userBids: Record<string, number>;
   user: any;
+  card: CardOnFile | null;
+  cardLoading: boolean;
+  onAddCard: () => void;
 }) {
   const userAuctions = auctions.filter(a => userBids[a.id] !== undefined);
+
   const leading = userAuctions.filter(a => a._userLeading).length;
   const outbid = userAuctions.length - leading;
   const totalCommitted = userAuctions.reduce((s, a) => s + (userBids[a.id] || 0) * a.players, 0);
