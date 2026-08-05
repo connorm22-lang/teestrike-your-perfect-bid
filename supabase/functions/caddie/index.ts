@@ -20,9 +20,9 @@ Deno.serve(async (req) => {
       });
     }
 
-    const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
+    const apiKey = Deno.env.get('LOVABLE_API_KEY');
     if (!apiKey) {
-      return new Response(JSON.stringify({ error: 'ANTHROPIC_API_KEY not configured' }), {
+      return new Response(JSON.stringify({ error: 'LOVABLE_API_KEY not configured' }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -45,31 +45,31 @@ Players: ${auction.players}
 
 Give tactical advice on whether this bid is smart. Reference the specific course, premium percentage, competition level, and timing.`;
 
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
+        'Lovable-API-Key': apiKey,
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 150,
+        model: 'google/gemini-3.6-flash',
         messages: [{ role: 'user', content: prompt }],
       }),
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('Anthropic API error:', errorText);
-      return new Response(JSON.stringify({ error: 'AI service error' }), {
-        status: 502,
+      console.error('AI gateway error:', response.status, errorText);
+      const status = response.status === 429 || response.status === 402 ? response.status : 502;
+      return new Response(JSON.stringify({ error: status === 429 ? 'Rate limit exceeded, try again shortly.' : status === 402 ? 'AI credits exhausted.' : 'AI service error' }), {
+        status,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
     const data = await response.json();
-    const advice = data.content?.[0]?.text || 'No advice available.';
+    const advice = data.choices?.[0]?.message?.content || 'No advice available.';
+
 
     return new Response(JSON.stringify({ advice }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
