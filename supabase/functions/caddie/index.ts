@@ -52,7 +52,7 @@ Give tactical advice on whether this bid is smart. Reference the specific course
         'Lovable-API-Key': apiKey,
       },
       body: JSON.stringify({
-        model: 'google/gemini-3-flash',
+        model: 'google/gemini-3.6-flash',
         messages: [{ role: 'user', content: prompt }],
       }),
     });
